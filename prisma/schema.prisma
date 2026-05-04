@@ -1,0 +1,324 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// --- ENUMS ---
+
+enum Rol {
+  CLIENTE_INTERNO
+  TECNICO
+  COORDINADOR_MTTO
+  JEFE_MTTO
+  SUPER_ADMIN
+}
+
+enum Estatus {
+  ACTIVO
+  INACTIVO
+}
+
+enum Prioridad {
+  BAJA
+  MEDIA
+  ALTA
+  CRITICA 
+}
+
+enum EstadoTarea {
+  PENDIENTE   
+  ASIGNADA    
+  EN_PROGRESO 
+  EN_PAUSA    
+  RESUELTO    
+  CERRADO     
+  RECHAZADO   
+  CANCELADA   
+}
+
+enum TipoEvento {
+  CREACION       
+  CAMBIO_ESTADO  
+  ASIGNACION     
+}
+
+enum TipoTarea {
+  TICKET  
+  PLANEADA 
+  EXTRAORDINARIA 
+}
+
+enum ClasificacionTarea {
+  PREVENTIVO        
+  CORRECTIVO        
+  INSPECCION        
+}
+
+enum TipoNotificacion {
+  NUEVO_REPORTE
+  TAREA_ASIGNADA
+  TAREA_INICIADA
+  TAREA_PAUSADA
+  TAREA_RESUELTA
+  TAREA_CERRADA
+  TAREA_RECHAZADA
+  TAREA_CANCELADA
+  TAREA_MODIFICADA
+  TAREA_REASIGNADA
+  REVISION_PENDIENTE
+  EQUIPO_RECHAZO
+}
+
+// --- MODELOS ---
+
+model Departamento {
+  id        Int       @id @default(autoincrement())
+  nombre    String    @unique
+  
+  planta    String   
+  tipo      String   
+  
+  estado    Estatus  @default(ACTIVO)
+  usuarios  Usuario[]
+  tareas    Tarea[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Usuario {
+  id             Int       @id @default(autoincrement())
+  username       String    @unique
+  email          String?   @unique
+  password       String    
+  nombre         String
+  telefono       String?
+  cargo          String?   
+  imagen         String?
+  
+  rol            Rol       @default(CLIENTE_INTERNO)
+  estado         Estatus   @default(ACTIVO)
+
+  mustChangePassword Boolean @default(false)
+
+  departamentoId Int?
+  // Restricción explícita: si se borra el depto, el usuario queda sin depto (null)
+  departamento   Departamento? @relation(fields: [departamentoId], references: [id], onDelete: SetNull)
+
+  tareasCreadas   Tarea[]   @relation("Creador")
+  tareasAsignadas Tarea[]   @relation("Responsables")
+
+  historialEventos HistorialTarea[]
+  bitacoras        Bitacora[]
+  
+  intervalosTiempo IntervaloTiempo[]
+  refreshTokens    RefreshToken[]
+  resetTokens PasswordResetToken[]
+  pushSubscriptions PushSubscription[]
+  notificacionesLog NotificacionLog[]
+  notificaciones   Notificacion[]
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Tarea {
+  id               Int                @id @default(autoincrement())
+  
+  // --- CLASIFICACIÓN DEL TRABAJO ---
+  tipo             TipoTarea          @default(TICKET)  
+  clasificacion    ClasificacionTarea @default(CORRECTIVO)
+  
+  titulo           String             @db.VarChar(255) 
+  categoria        String?            
+  descripcion      String             @db.Text 
+  prioridad        Prioridad          @default(MEDIA)
+  
+  // --- UBICACIÓN ---
+  planta           String             @default("KAPPA")
+  area             String?       
+
+  // --- ESTADO Y FLUJO ---
+  estado           EstadoTarea        @default(PENDIENTE)
+  
+  fechaVencimiento DateTime?          
+  tiempoEstimado   Int? 
+  
+  fechaInicio      DateTime?   
+  finalizadoAt     DateTime? 
+  
+  duracionReal     Int?               @default(0)
+
+  // --- RELACIONES ---
+  creadorId        Int
+  creador          Usuario            @relation("Creador", fields: [creadorId], references: [id], onDelete: Restrict)
+
+  departamentoId   Int?      
+  departamento     Departamento?      @relation(fields: [departamentoId], references: [id], onDelete: SetNull)
+
+  responsables     Usuario[]          @relation("Responsables") 
+  
+  historial        HistorialTarea[] 
+  imagenes         Imagen[]
+  intervalos       IntervaloTiempo[]
+  notificaciones   Notificacion[]
+
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  // --- ÍNDICES DE RENDIMIENTO ---
+  @@index([creadorId])         
+  @@index([departamentoId])    
+  @@index([estado])            
+  @@index([createdAt])         
+  @@index([titulo])            
+  @@index([tipo])              
+  @@index([departamentoId, estado]) 
+  @@index([creadorId, createdAt])   
+}
+
+model HistorialTarea {
+  id             Int          @id @default(autoincrement())
+  
+  tareaId        Int
+  tarea          Tarea        @relation(fields: [tareaId], references: [id], onDelete: Cascade)
+  
+  usuarioId      Int
+  usuario        Usuario      @relation(fields: [usuarioId], references: [id], onDelete: Restrict)
+  
+  tipo           TipoEvento
+  estadoAnterior EstadoTarea? 
+  estadoNuevo    EstadoTarea? 
+
+  nota           String?      @db.Text 
+  
+  imagenes       Imagen[]  
+  
+  createdAt      DateTime     @default(now())
+}
+
+model Imagen {
+  id          Int             @id @default(autoincrement())
+  url         String   
+  tipo        String?         
+  
+  tareaId     Int
+  tarea       Tarea           @relation(fields: [tareaId], references: [id], onDelete: Cascade)
+
+  historialId Int?
+  historial   HistorialTarea? @relation(fields: [historialId], references: [id], onDelete: SetNull)
+
+  createdAt   DateTime        @default(now())
+}
+
+model Bitacora {
+  id        Int      @id @default(autoincrement())
+  accion    String   
+  detalles  String?  @db.Text
+  
+  usuarioId Int?     
+  usuario   Usuario? @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+}
+
+model Notificacion {
+  id           Int              @id @default(autoincrement())
+  usuarioId    Int
+  usuario      Usuario          @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  tipo         TipoNotificacion
+  titulo       String           @db.VarChar(255)
+  cuerpo       String           @db.Text
+  
+  // Relación
+  tareaId      Int?
+  tarea        Tarea?           @relation(fields: [tareaId], references: [id], onDelete: SetNull)
+
+  leida        Boolean          @default(false)
+  accionada    Boolean          @default(false)
+  createdAt    DateTime         @default(now())
+
+  // Índices optimizados
+  @@index([usuarioId])
+  @@index([usuarioId, leida]) 
+  @@index([tareaId])
+  @@index([createdAt])
+}
+
+model IntervaloTiempo {
+  id        Int         @id @default(autoincrement())
+  
+  tareaId   Int
+  tarea     Tarea       @relation(fields: [tareaId], references: [id], onDelete: Cascade)
+  
+  usuarioId Int       
+  usuario   Usuario     @relation(fields: [usuarioId], references: [id], onDelete: Restrict)
+  
+  estado    EstadoTarea 
+  
+  inicio    DateTime    @default(now())
+  fin       DateTime?
+  
+  duracion  Int? 
+}
+
+model RefreshToken {
+  id          String   @id @default(uuid())
+  hashedToken String
+  
+  usuarioId   Int
+  usuario     Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  
+  revoked     Boolean  @default(false)
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+}
+
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  usuarioId Int
+  usuario   Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+model PushSubscription {
+  id           Int      @id @default(autoincrement())
+  endpoint     String   @unique @db.VarChar(500) 
+  p256dh       String   @db.Text 
+  auth         String   @db.Text 
+  
+  usuarioId    Int
+  usuario      Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  
+  createdAt    DateTime @default(now())
+
+  lastSuccess  DateTime?
+  failureCount Int      @default(0)
+
+  @@index([usuarioId])
+}
+
+model NotificacionLog {
+  id                   String   @id @default(uuid())
+  
+  usuarioId            Int
+  usuario              Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Restrict)
+  
+  titulo               String
+  cuerpo               String   @db.Text
+  
+  dispositivosObjetivo Int
+  enviadosExito        Int 
+  fallidos             Int 
+  
+  createdAt            DateTime @default(now())
+
+  @@index([usuarioId])
+  @@index([createdAt])
+}
