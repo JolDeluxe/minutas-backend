@@ -1,10 +1,11 @@
+import { Rol } from "@prisma/client";
+
 export interface TokenPayload {
   id: number;
   username: string;
   email: string | null;
-  rol: string;
+  rol: Rol;
   nombre: string;
-  departamentoId: number | null;
 }
 
 export interface LoginResponse {
@@ -15,9 +16,8 @@ export interface LoginResponse {
     id: number;
     nombre: string;
     username: string;
-    rol: string;
-    departamentoId: number | null;
-    email?: string; 
+    rol: Rol;
+    email?: string;
     mustChangePassword: boolean;
   };
 }

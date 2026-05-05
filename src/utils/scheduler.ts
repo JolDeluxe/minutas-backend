@@ -1,61 +1,60 @@
 import cron from "node-cron";
 import { prisma } from "../db";
-import { autoCloseResolvedTickets, enviarAdvertenciasFinTurno, ejecutarAutoPausaFinTurno } from "../modules/tickets/automations";
+import { EstadoTarea } from "@prisma/client";
 
 export const iniciarTareasProgramadas = () => {
-  // CRON 1: Cierre automático de tickets resueltos inactivos
-  // Ejecuta todos los días a la 01:00 AM (hora del servidor)
-  cron.schedule("0 1 * * *", async () => {
-  // cron.schedule("* * * * *", async () => { // Los 5 asteriscos significan "cada minuto"
 
-    console.log("[CRON] Iniciando evaluación de cierre automático de tickets...");
+  // CRON 1: Auto-cierre de tareas vencidas
+  // Todos los días a la 01:00 AM
+  cron.schedule("0 1 * * *", async () => {
+    console.log("[CRON] Evaluando tareas vencidas para auto-cierre...");
     try {
-      await autoCloseResolvedTickets();
-      console.log("[CRON] Evaluación de tickets finalizada.");
+      const hoy = new Date();
+
+      const tareasCandidatas = await prisma.tarea.findMany({
+        where: {
+          estado: { notIn: [EstadoTarea.CERRADO] },
+          fechaVencimiento: { lte: hoy },
+        },
+        select: { id: true, estado: true, completadoAt: true },
+      });
+
+      let cerradas = 0;
+
+      for (const tarea of tareasCandidatas) {
+        await prisma.tarea.update({
+          where: { id: tarea.id },
+          data: {
+            estado: EstadoTarea.CERRADO,
+            cerradoAt: hoy,
+          },
+        });
+        cerradas++;
+      }
+
+      console.log(`[CRON] Auto-cierre completado: ${cerradas} tareas cerradas.`);
     } catch (error) {
-      console.error("[CRON ERROR] Falló el cierre automático de tickets:", error);
+      console.error("[CRON ERROR] Falló el auto-cierre de tareas:", error);
     }
   });
 
-  // CRON 2: Limpieza de bitácora antigua
-  // Ejecuta todos los días a las 03:00 AM (hora del servidor)
+  // CRON 2: Limpieza de bitácora antigua (6 meses)
   cron.schedule("0 3 * * *", async () => {
-    console.log("[CRON] Iniciando limpieza de bitácora antigua...");
-    
-    const diasRetencion = 180; 
     const fechaLimite = new Date();
-    fechaLimite.setDate(fechaLimite.getDate() - diasRetencion);
+    fechaLimite.setDate(fechaLimite.getDate() - 180);
 
     try {
       const borrados = await prisma.bitacora.deleteMany({
-        where: {
-          createdAt: {
-            lt: fechaLimite
-          }
-        }
+        where: { createdAt: { lt: fechaLimite } },
       });
-      
+
       if (borrados.count > 0) {
-        console.log(`[CRON] Limpieza completada. Se eliminaron ${borrados.count} registros de hace más de 6 meses.`);
-      } else {
-        console.log("[CRON] Todo limpio. No había registros tan antiguos en bitácora.");
+        console.log(`[CRON] Bitácora limpiada: ${borrados.count} registros eliminados.`);
       }
     } catch (error) {
       console.error("[CRON ERROR] Falló la limpieza de bitácora:", error);
     }
   });
 
-  // CRON 3: Advertencia de fin de turno a las 17:45 (Lunes a Sábado)
-  cron.schedule("45 17 * * 1-6", async () => {
-    console.log("[CRON] Ejecutando advertencia de fin de turno (17:45)...");
-    await enviarAdvertenciasFinTurno();
-  });
-
-  // CRON 4: Auto-Pausa y recorte de tiempo a las 19:00 (Lunes a Sábado)
-  cron.schedule("0 19 * * 1-6", async () => {
-    console.log("[CRON] Ejecutando Auto-Pausa implacable (19:00)...");
-    await ejecutarAutoPausaFinTurno();
-  });
-  
-  console.log("[SYSTEM] Tareas programadas (CRON) inicializadas: Tickets (01:00 AM) | Bitácora (03:00 AM) | Turno (17:45/19:00).");
+  console.log("[SYSTEM] CRON inicializados: Auto-cierre tareas (01:00 AM) | Limpieza bitácora (03:00 AM)");
 };

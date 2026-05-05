@@ -8,11 +8,10 @@ cloudinary.config({
 });
 
 export const uploadUserProfileImage = async (buffer: Buffer): Promise<string> => {
-  const base64 = buffer.toString("base64");
-  const dataUri = `data:image/jpeg;base64,${base64}`;
+  const dataUri = `data:image/jpeg;base64,${buffer.toString("base64")}`;
 
   const result = await cloudinary.uploader.upload(dataUri, {
-    folder: "Mantenimiento/Usuarios",
+    folder: "TRACE/Usuarios",
     resource_type: "image",
     transformation: [
       { width: 500, height: 500, crop: "thumb", gravity: "face" },
@@ -24,12 +23,13 @@ export const uploadUserProfileImage = async (buffer: Buffer): Promise<string> =>
   return result.secure_url;
 };
 
-export const uploadTaskImage = async (buffer: Buffer): Promise<string> => {
-  const base64 = buffer.toString("base64");
-  const dataUri = `data:image/jpeg;base64,${base64}`;
+export const uploadTaskImage = async (
+  buffer: Buffer
+): Promise<{ url: string; publicId: string }> => {
+  const dataUri = `data:image/jpeg;base64,${buffer.toString("base64")}`;
 
   const result = await cloudinary.uploader.upload(dataUri, {
-    folder: "Mantenimiento/Tareas",
+    folder: "TRACE/Tareas",
     resource_type: "image",
     transformation: [
       { width: 1280, crop: "limit" },
@@ -38,28 +38,27 @@ export const uploadTaskImage = async (buffer: Buffer): Promise<string> => {
     ],
   });
 
-  return result.secure_url;
+  return { url: result.secure_url, publicId: result.public_id };
 };
 
-export const deleteImageByUrl = async (imageUrl: string) => {
-  if (!imageUrl || !imageUrl.includes("cloudinary")) return;
-  if (imageUrl.includes("no-image.avif") || imageUrl.includes("perfil-no-foto")) return;
+export const deleteImageByPublicId = async (publicId: string): Promise<void> => {
+  if (!publicId) return;
+  try {
+    await cloudinary.uploader.destroy(publicId);
+  } catch (error) {
+    console.error("[Cloudinary] Error al eliminar imagen:", error);
+  }
+};
 
+export const deleteImageByUrl = async (imageUrl: string): Promise<void> => {
+  if (!imageUrl || !imageUrl.includes("cloudinary")) return;
   try {
     const parts = imageUrl.split("/upload/");
-    
-    // Validación explícita para calmar al compilador estricto de TypeScript
     const extract = parts[1];
     if (!extract) return;
-
-    let publicIdConExtension = extract.replace(/^v\d+\//, "");
-    const publicId = publicIdConExtension.replace(/\.[^/.]+$/, "");
-
-    if (publicId) {
-      await cloudinary.uploader.destroy(publicId);
-      console.log(`☁️ [Cloudinary] Imagen destruida físicamente: ${publicId}`);
-    }
+    const publicId = extract.replace(/^v\d+\//, "").replace(/\.[^/.]+$/, "");
+    if (publicId) await cloudinary.uploader.destroy(publicId);
   } catch (error) {
-    console.error("🔥 [Cloudinary] Error crítico al intentar eliminar imagen:", error);
+    console.error("[Cloudinary] Error al eliminar imagen por URL:", error);
   }
 };

@@ -9,7 +9,6 @@ declare global {
         nombre: string; 
         email: string;
         rol: Rol;
-        departamentoId: number | null; 
       };
     }
   }

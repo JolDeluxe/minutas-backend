@@ -1,68 +1,56 @@
 import express from "express";
 import http from "http";
-import path from "path";
-import morgan from 'morgan';
+import morgan from "morgan";
 import { env } from "./env";
 import { corsMiddleware } from "./middlewares/cors";
-
-// Utilidades del sistema
-import { iniciarTareasProgramadas } from './utils/scheduler';
-import { inicializarSistema } from "./utils/setup"; 
-import { initSocket } from "./utils/socket"; 
+import { iniciarTareasProgramadas } from "./utils/scheduler";
+import { inicializarSistema } from "./utils/setup";
+import { initSocket } from "./utils/socket";
 
 // Rutas
 import auth from "./routes/auth_rutas";
 import usuarios from "./routes/usuarios_rutas";
-import departamentos from "./routes/departamentos_rutas";
-import bitacora from './routes/bitacora_rutas';
-import tickets from './routes/tickets_rutas';
-import notificaciones from "./routes/notificaciones_rutas";
-import dashboard from "./routes/dashboard_rutas";
+// import minutas from "./routes/minutas_rutas";
+// import tareas from "./routes/tareas_rutas";
+// import asignaciones from "./routes/asignaciones_rutas";
+// import imagenes from "./routes/imagenes_rutas";
+// import metricas from "./routes/metricas_rutas";
+// import pdf from "./routes/pdf_rutas";
 
 const app = express();
 const httpServer = http.createServer(app);
 
-// --- MIDDLEWARES ---
-app.use(corsMiddleware); 
+app.use(corsMiddleware);
 app.use(express.json());
-app.use(morgan('dev'));
+app.use(morgan("dev"));
 
-// --- CONFIGURACIÓN DE ARCHIVOS ESTÁTICOS ---
-app.use(express.static(path.join(__dirname, "../public")));
-
-// --- RUTA BASE (Health Check) ---
-app.get("/", (req, res) => {
-  res.send("Backend Mantenimiento: ONLINE 🚀");
+app.get("/", (_req, res) => {
+  res.send("TRACE Backend: ONLINE 🚀");
 });
 
-// --- MONTAJE DE RUTAS API ---
 app.use("/api/auth", auth);
 app.use("/api/usuarios", usuarios);
-app.use("/api/departamentos", departamentos);
-app.use("/api/bitacora", bitacora);
-app.use("/api/tickets", tickets);
-app.use("/api/notificaciones", notificaciones);
-app.use("/api/dashboard", dashboard);
-
-// --- ARRANQUE DEL SERVIDOR ---
+// app.use("/api/minutas", minutas);
+// app.use("/api/tareas", tareas);
+// app.use("/api/asignaciones", asignaciones);
+// app.use("/api/imagenes", imagenes);
+// app.use("/api/metricas", metricas);
+// app.use("/api/pdf", pdf);
 
 const startServer = async () => {
-    try {
-        await inicializarSistema();
+  try {
+    await inicializarSistema();
+    initSocket(httpServer);
 
-        initSocket(httpServer);
-
-        httpServer.listen(env.PORT, '0.0.0.0', () => {
-            console.log(`Servidor corriendo en http://localhost:${env.PORT}`);
-            console.log(`Ambiente: ${env.NODE_ENV}`);
-            iniciarTareasProgramadas();
-        });
-
-    } catch (error) {
-        console.error("❌ Error fatal al iniciar el servidor:", error);
-        process.exit(1);
-    }
+    httpServer.listen(env.PORT, "0.0.0.0", () => {
+      console.log(`Servidor TRACE corriendo en http://localhost:${env.PORT}`);
+      console.log(`Ambiente: ${env.NODE_ENV}`);
+      iniciarTareasProgramadas();
+    });
+  } catch (error) {
+    console.error("❌ Error fatal al iniciar el servidor:", error);
+    process.exit(1);
+  }
 };
 
-// Ejecutar
 startServer();

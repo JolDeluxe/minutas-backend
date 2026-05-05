@@ -2,19 +2,15 @@ import cors from "cors";
 import { env } from "../env";
 
 const whitelist = [
-  "http://localhost:5000",
-  "http://localhost:5001",
+  "http://localhost:5173",
+  "http://localhost:5174",
   "http://localhost:3000",
-
-  "http://200.1.0.72:5000",
-  // Aquí agregaremos luego los dominios de Netlify:
-  "https://cuadra-mantenimiento.netlify.app",
-  "https://cuadra-mbc-mantenimiento-interno.netlify.app"
+  // Agregar dominio de producción cuando esté definido
 ];
 
 const corsOptions: cors.CorsOptions = {
   origin: (origin, callback) => {
-    if (!origin || whitelist.indexOf(origin) !== -1) {
+    if (env.NODE_ENV === "development" || !origin || whitelist.includes(origin)) {
       callback(null, true);
     } else {
       console.error(`❌ Bloqueado por CORS: ${origin}`);
@@ -23,8 +19,8 @@ const corsOptions: cors.CorsOptions = {
   },
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
-  optionsSuccessStatus: 204, 
+  allowedHeaders: ["Content-Type", "Authorization"],
+  optionsSuccessStatus: 204,
 };
 
 export const corsMiddleware = cors(corsOptions);
