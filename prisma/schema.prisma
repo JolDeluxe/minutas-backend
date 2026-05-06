@@ -81,6 +81,9 @@ model Usuario {
   rol    Rol     @default(COORDINADOR)
   estado Estatus @default(ACTIVO)
 
+  area  Area   @default(DISENO)
+  linea Linea?
+
   mustChangePassword Boolean @default(false)
 
   minutasCreadas Minuta[]             @relation("MinutaCreador")
@@ -123,7 +126,7 @@ model Tarea {
   descripcion String @db.Text
 
   // Captura fase 1 (durante junta — todos opcionales)
-  area      Area?
+  area      Area       @default(DISENO)
   prioridad Prioridad?
   linea     Linea?
 

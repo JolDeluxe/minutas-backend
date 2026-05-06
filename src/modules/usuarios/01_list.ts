@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 import { prisma } from "../../db";
-import { Rol, Estatus, Prisma } from "@prisma/client";
+import { Rol, Estatus, Area, Linea, Prisma } from "@prisma/client";
 import { getSecurityFilters } from "./helper";
 import { registrarError } from "../../utils/logger";
 import type { ListUsuariosQuery, GetUsuarioByIdParams } from "./zod";
@@ -13,13 +13,15 @@ const sharedSelect = {
   imagen: true,
   rol: true,
   estado: true,
+  area: true,
+  linea: true,
   createdAt: true,
 } satisfies Prisma.UsuarioSelect;
 
 export const listarUsuarios = async (req: Request, res: Response) => {
   try {
     const solicitante = req.user!;
-    const { q, page, limit, rol, estado, sort } = req.query as unknown as ListUsuariosQuery;
+    const { q, page, limit, rol, estado, area, linea, sort } = req.query as unknown as ListUsuariosQuery;
 
     const filtroSeguridad = getSecurityFilters(solicitante);
 
@@ -43,6 +45,8 @@ export const listarUsuarios = async (req: Request, res: Response) => {
     }
 
     if (rol) where.rol = rol as Rol;
+    if (area) where.area = area as Area;
+    if (linea) where.linea = linea as Linea;
 
     const [total, resumenRoles, usuarios] = await Promise.all([
       prisma.usuario.count({ where }),

@@ -11,17 +11,20 @@ export const getMinutaById = async (req: Request, res: Response) => {
     const minuta = await prisma.minuta.findUnique({
       where: { id },
       include: {
-        creadoPor: { select: { id: true, nombre: true, username: true, imagen: true } },
+        // Se agrega area y linea en el creador de la minuta
+        creadoPor: { select: { id: true, nombre: true, username: true, imagen: true, area: true, linea: true } },
         tareas: {
           orderBy: { createdAt: "asc" },
           include: {
             imagenes: { orderBy: { orden: "asc" } },
             asignaciones: {
               include: {
-                usuario: { select: { id: true, nombre: true, username: true, imagen: true } },
+                // Se agrega area y linea en los usuarios asignados para la UI del triage
+                usuario: { select: { id: true, nombre: true, username: true, imagen: true, area: true, linea: true } },
               },
             },
-            creadoPor: { select: { id: true, nombre: true, username: true } },
+            // Se agrega area y linea en el creador de la tarea
+            creadoPor: { select: { id: true, nombre: true, username: true, area: true, linea: true } },
           },
         },
       },

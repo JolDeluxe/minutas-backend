@@ -10,7 +10,9 @@ export const deleteTarea = async (req: Request, res: Response) => {
     const usuarioId = req.user!.id;
     const { id }    = req.params as unknown as TareaIdParams;
 
-    if (![Rol.GERENCIA, Rol.JEFE].includes(req.user!.rol)) {
+    // Corrección del error de TS tipando el arreglo explícitamente
+    const rolesPermitidos: Rol[] = [Rol.GERENCIA, Rol.JEFE];
+    if (!rolesPermitidos.includes(req.user!.rol)) {
       return res.status(403).json({ error: "Solo GERENCIA o JEFE pueden eliminar tareas" });
     }
 

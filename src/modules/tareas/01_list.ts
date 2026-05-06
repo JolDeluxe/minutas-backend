@@ -6,8 +6,7 @@ import type { ListTareasQuery } from "./zod";
 
 export const listarTareas = async (req: Request, res: Response) => {
   try {
-    const { page, limit, estado, area, minutaId, isExternalArea, isComplete, q } =
-      req.query as unknown as ListTareasQuery;
+    const { page, limit, estado, area, minutaId, isExternalArea, capturaCompleta, q } = req.query as any;
     const offset = (page - 1) * limit;
 
     const where: Prisma.TareaWhereInput = {};
@@ -16,7 +15,7 @@ export const listarTareas = async (req: Request, res: Response) => {
     if (area)                         where.area           = area as Area;
     if (minutaId)                     where.minutaId       = minutaId;
     if (isExternalArea !== undefined) where.isExternalArea = isExternalArea;
-    if (isComplete !== undefined)     where.isComplete     = isComplete;
+    if (capturaCompleta !== undefined) where.capturaCompleta = capturaCompleta;
     if (q)                            where.descripcion    = { contains: q };
 
     const [total, tareas] = await prisma.$transaction([

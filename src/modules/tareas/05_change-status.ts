@@ -20,13 +20,16 @@ export const changeEstadoTarea = async (req: Request, res: Response) => {
 
     if (!tarea) return res.status(404).json({ error: "Tarea no encontrada" });
 
+    // Corrección del error de TS tipando el arreglo explícitamente
+    const rolesJefatura: Rol[] = [Rol.GERENCIA, Rol.JEFE];
+    const esJefeOGerente = rolesJefatura.includes(rolUsuario);
+
     // Bloqueo: Tareas externas no se completan manualmente
-    if (tarea.isExternalArea && !['GERENCIA', 'JEFE'].includes(rolUsuario)) {
+    if (tarea.isExternalArea && !esJefeOGerente) {
       return res.status(403).json({ error: "Las tareas externas se cierran automáticamente, no se completan manualmente." });
     }
 
     const asignacionDelUsuario = tarea.asignaciones.find(a => a.usuarioId === usuarioId);
-    const esJefeOGerente = ['GERENCIA', 'JEFE'].includes(rolUsuario);
 
     // Si es un usuario normal (diseñador), actualiza SU asignación
     if (!esJefeOGerente) {

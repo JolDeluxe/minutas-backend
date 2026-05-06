@@ -24,7 +24,8 @@ export const createTareaSchema = z.object({
   body: z.object({
     descripcion:      z.string().min(3, "La descripción es requerida"),
     minutaId:         z.preprocess(pre, z.coerce.number().int().positive().optional()),
-    area:             z.preprocess(pre, z.enum(areaValues).optional()),
+    // Se añade default(Area.DISENO) para la captura rápida de la asistente
+    area:             z.preprocess(pre, z.enum(areaValues).default(Area.DISENO)),
     prioridad:        z.preprocess(pre, z.enum(prioridadValues).optional()),
     linea:            z.preprocess(pre, z.enum(lineaValues).optional()),
     clasificacion:    z.preprocess(pre, z.enum(clasifValues).optional()),

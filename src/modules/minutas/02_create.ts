@@ -16,7 +16,8 @@ export const crearMinuta = async (req: Request, res: Response) => {
         creadoPorId:  usuarioId,
       },
       include: {
-        creadoPor: { select: { id: true, nombre: true, username: true, imagen: true } },
+        // Se agrega area y linea para identificar el departamento del creador en la respuesta inmediata
+        creadoPor: { select: { id: true, nombre: true, username: true, imagen: true, area: true, linea: true } },
         _count:    { select: { tareas: true } },
       },
     });

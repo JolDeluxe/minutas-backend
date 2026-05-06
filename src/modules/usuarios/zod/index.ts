@@ -1,8 +1,10 @@
 import { z } from "zod";
-import { Rol, Estatus } from "@prisma/client";
+import { Rol, Estatus, Area, Linea } from "@prisma/client";
 
 const rolesArray = Object.values(Rol) as [string, ...string[]];
 const estatusArray = Object.values(Estatus) as [string, ...string[]];
+const areasArray = Object.values(Area) as [string, ...string[]];
+const lineasArray = Object.values(Linea) as [string, ...string[]];
 
 export const listUsuariosSchema = z.object({
   query: z.object({
@@ -11,6 +13,8 @@ export const listUsuariosSchema = z.object({
     limit: z.coerce.number().min(1).max(100).default(20),
     rol: z.enum(rolesArray).optional(),
     estado: z.enum(estatusArray).optional(),
+    area: z.enum(areasArray).optional(),
+    linea: z.enum(lineasArray).optional(),
     sort: z.preprocess(
       (val) => {
         if (typeof val === "string") {
@@ -51,6 +55,13 @@ export const createUsuarioSchema = z.object({
 
     rol: z.enum(rolesArray, { message: "Rol inválido" }).default(Rol.COORDINADOR),
 
+    area: z.enum(areasArray, { message: "Área inválida" }).default(Area.DISENO),
+    
+    linea: z.preprocess(
+      (val) => (val === "null" || val === "" ? null : val),
+      z.enum(lineasArray).nullable().optional()
+    ),
+
     imagen: z.preprocess(
       (val) => (val === "null" || val === "" ? null : val),
       z.string().nullable().optional()
@@ -82,6 +93,13 @@ export const updateUsuarioSchema = z.object({
     rol: z.enum(rolesArray).optional(),
 
     estado: z.enum(estatusArray).optional(),
+
+    area: z.enum(areasArray).optional(),
+
+    linea: z.preprocess(
+      (val) => (val === "null" || val === "" ? null : val),
+      z.enum(lineasArray).nullable().optional()
+    ),
   }).strict(),
 });
 

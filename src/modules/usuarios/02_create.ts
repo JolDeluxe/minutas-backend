@@ -1,7 +1,7 @@
 import type { Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import { prisma } from "../../db";
-import { Rol } from "@prisma/client";
+import { Rol, Area, Linea } from "@prisma/client";
 import type { CreateUsuarioInput } from "./zod";
 import { generarUsername } from "./utils/userGenerator";
 import { validarReglasCreacion } from "./helper";
@@ -11,7 +11,7 @@ import { uploadUserProfileImage } from "../../utils/cloudinary";
 export const crearUsuario = async (req: Request, res: Response) => {
   try {
     const solicitante = req.user!;
-    const { nombre, email, password, rol, username } = req.body as CreateUsuarioInput;
+    const { nombre, email, password, rol, username, area, linea } = req.body as CreateUsuarioInput;
 
     try {
       validarReglasCreacion(solicitante, rol as Rol);
@@ -71,9 +71,11 @@ export const crearUsuario = async (req: Request, res: Response) => {
         email: email ?? null,
         password: hashedPassword,
         rol: rol as Rol,
+        area: area as Area,
+        linea: linea as Linea | null,
         imagen: imagenUrl,
       },
-      select: { id: true, username: true, email: true, rol: true, nombre: true, imagen: true },
+      select: { id: true, username: true, email: true, rol: true, nombre: true, area: true, linea: true, imagen: true },
     });
 
     await registrarAccion(
