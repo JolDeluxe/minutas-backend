@@ -3,7 +3,7 @@ import { prisma } from "../../db";
 import { Area, Linea, Prioridad, Clasificacion } from "@prisma/client";
 import { registrarAccion, registrarError } from "../../utils/logger";
 import { uploadTaskImage } from "../../utils/cloudinary";
-import { calcularIsExternalArea, calcularIsComplete } from "./helpers";
+import { calcularIsExternalArea, calcularCapturaCompleta } from "./helpers";
 import type { CreateTareaInput } from "./zod";
 
 export const crearTarea = async (req: Request, res: Response) => {
@@ -58,14 +58,14 @@ export const crearTarea = async (req: Request, res: Response) => {
         });
       }
 
-      const isComplete = calcularIsComplete({
+      const nuevaCapturaCompleta = calcularCapturaCompleta({
         clasificacion:     nueva.clasificacion,
         fechaVencimiento:  nueva.fechaVencimiento,
         totalAsignaciones: responsables?.length ?? 0,
       });
 
-      if (isComplete) {
-        await tx.tarea.update({ where: { id: nueva.id }, data: { isComplete: true } });
+      if (nuevaCapturaCompleta) {
+        await tx.tarea.update({ where: { id: nueva.id }, data: { capturaCompleta: true } });
       }
 
       return nueva.id;

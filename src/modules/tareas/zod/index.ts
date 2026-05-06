@@ -79,7 +79,7 @@ export const listTareasSchema = z.object({
     area:           z.preprocess(pre, z.enum(areaValues).optional()),
     minutaId:       z.preprocess(pre, z.coerce.number().int().positive().optional()),
     isExternalArea: z.preprocess((v) => v === "true" ? true : v === "false" ? false : undefined, z.boolean().optional()),
-    isComplete:     z.preprocess((v) => v === "true" ? true : v === "false" ? false : undefined, z.boolean().optional()),
+    capturaCompleta: z.preprocess((v) => v === "true" ? true : v === "false" ? false : undefined, z.boolean().optional()),
     q:              z.string().optional(),
   }),
 });
