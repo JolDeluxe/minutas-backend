@@ -79,6 +79,7 @@ export const listTareasSchema = z.object({
     estado:         z.preprocess(pre, z.enum(estadoValues).optional()),
     area:           z.preprocess(pre, z.enum(areaValues).optional()),
     minutaId:       z.preprocess(pre, z.coerce.number().int().positive().optional()),
+    linea:          z.preprocess(pre, z.enum(lineaValues).optional()), // <-- SE AÑADE ESTO
     isExternalArea: z.preprocess((v) => v === "true" ? true : v === "false" ? false : undefined, z.boolean().optional()),
     capturaCompleta: z.preprocess((v) => v === "true" ? true : v === "false" ? false : undefined, z.boolean().optional()),
     q:              z.string().optional(),
