@@ -10,8 +10,8 @@ import { initSocket } from "./utils/socket";
 // Rutas
 import auth from "./routes/auth_rutas";
 import usuarios from "./routes/usuarios_rutas";
-// import minutas from "./routes/minutas_rutas";
-// import tareas from "./routes/tareas_rutas";
+import minutas from "./routes/minutas_rutas";
+import tareas from "./routes/tareas_rutas";
 // import asignaciones from "./routes/asignaciones_rutas";
 // import imagenes from "./routes/imagenes_rutas";
 // import metricas from "./routes/metricas_rutas";
@@ -25,13 +25,13 @@ app.use(express.json());
 app.use(morgan("dev"));
 
 app.get("/", (_req, res) => {
-  res.send("TRACE Backend: ONLINE 🚀");
+  res.send("Minutas Backend: ONLINE 🚀");
 });
 
 app.use("/api/auth", auth);
 app.use("/api/usuarios", usuarios);
-// app.use("/api/minutas", minutas);
-// app.use("/api/tareas", tareas);
+app.use("/api/minutas", minutas);
+app.use("/api/tareas", tareas);
 // app.use("/api/asignaciones", asignaciones);
 // app.use("/api/imagenes", imagenes);
 // app.use("/api/metricas", metricas);
@@ -43,7 +43,7 @@ const startServer = async () => {
     initSocket(httpServer);
 
     httpServer.listen(env.PORT, "0.0.0.0", () => {
-      console.log(`Servidor TRACE corriendo en http://localhost:${env.PORT}`);
+      console.log(`Servidor Minutas corriendo en http://localhost:${env.PORT}`);
       console.log(`Ambiente: ${env.NODE_ENV}`);
       iniciarTareasProgramadas();
     });

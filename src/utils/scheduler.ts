@@ -1,60 +1,60 @@
 import cron from "node-cron";
 import { prisma } from "../db";
 import { EstadoTarea } from "@prisma/client";
+import { evaluarEstadoMinuta } from "../modules/tareas/helpers";
 
 export const iniciarTareasProgramadas = () => {
+  console.log("⏳ Tareas programadas (CRON) inicializadas.");
 
-  // CRON 1: Auto-cierre de tareas vencidas
-  // Todos los días a la 01:00 AM
-  cron.schedule("0 1 * * *", async () => {
-    console.log("[CRON] Evaluando tareas vencidas para auto-cierre...");
+  // Se ejecuta todos los días a las 2:00 AM ("0 2 * * *")
+  cron.schedule("0 2 * * *", async () => {
+    console.log("Iniciando revisión diaria de tareas (CRON)...");
+    
     try {
-      const hoy = new Date();
+      const ahora = new Date();
+      
+      // 1. Cerrar Tareas de Diseño Completadas que nadie revisó (Regla de 10 días)
+      const hace10Dias = new Date();
+      hace10Dias.setDate(hace10Dias.getDate() - 10);
 
-      const tareasCandidatas = await prisma.tarea.findMany({
+      const tareasOlidadas = await prisma.tarea.findMany({
         where: {
-          estado: { notIn: [EstadoTarea.CERRADO] },
-          fechaVencimiento: { lte: hoy },
-        },
-        select: { id: true, estado: true, completadoAt: true },
+          estado: EstadoTarea.COMPLETADO,
+          isExternalArea: false,
+          completadoAt: { lte: hace10Dias },
+          fechaVencimiento: { lte: ahora } // Ya pasó la fecha límite
+        }
       });
 
-      let cerradas = 0;
-
-      for (const tarea of tareasCandidatas) {
-        await prisma.tarea.update({
-          where: { id: tarea.id },
-          data: {
-            estado: EstadoTarea.CERRADO,
-            cerradoAt: hoy,
-          },
-        });
-        cerradas++;
-      }
-
-      console.log(`[CRON] Auto-cierre completado: ${cerradas} tareas cerradas.`);
-    } catch (error) {
-      console.error("[CRON ERROR] Falló el auto-cierre de tareas:", error);
-    }
-  });
-
-  // CRON 2: Limpieza de bitácora antigua (6 meses)
-  cron.schedule("0 3 * * *", async () => {
-    const fechaLimite = new Date();
-    fechaLimite.setDate(fechaLimite.getDate() - 180);
-
-    try {
-      const borrados = await prisma.bitacora.deleteMany({
-        where: { createdAt: { lt: fechaLimite } },
+      // 2. Cerrar Tareas Externas por fecha de vencimiento
+      const tareasExternasVencidas = await prisma.tarea.findMany({
+        where: {
+          isExternalArea: true,
+          estado: { not: EstadoTarea.CERRADO },
+          fechaVencimiento: { lte: ahora }
+        }
       });
 
-      if (borrados.count > 0) {
-        console.log(`[CRON] Bitácora limpiada: ${borrados.count} registros eliminados.`);
+      const tareasACerrar = [...tareasOlidadas, ...tareasExternasVencidas];
+
+      if (tareasACerrar.length > 0) {
+        for (const tarea of tareasACerrar) {
+          await prisma.tarea.update({
+            where: { id: tarea.id },
+            data: { estado: EstadoTarea.CERRADO, cerradoAt: ahora }
+          });
+
+          // Revisar si esto provoca que su minuta se cierre automáticamente
+          if (tarea.minutaId) {
+            await evaluarEstadoMinuta(tarea.minutaId);
+          }
+        }
+        console.log(`✅ CRON: Se cerraron automáticamente ${tareasACerrar.length} tareas.`);
+      } else {
+        console.log("✅ CRON: Revisión completada. Sin tareas para cerrar hoy.");
       }
     } catch (error) {
-      console.error("[CRON ERROR] Falló la limpieza de bitácora:", error);
+      console.error("❌ Error ejecutando el CRON de tareas:", error);
     }
   });
-
-  console.log("[SYSTEM] CRON inicializados: Auto-cierre tareas (01:00 AM) | Limpieza bitácora (03:00 AM)");
 };
