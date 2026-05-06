@@ -20,18 +20,15 @@ export const changeEstadoTarea = async (req: Request, res: Response) => {
 
     if (!tarea) return res.status(404).json({ error: "Tarea no encontrada" });
 
-    // Corrección del error de TS tipando el arreglo explícitamente
     const rolesJefatura: Rol[] = [Rol.GERENCIA, Rol.JEFE];
     const esJefeOGerente = rolesJefatura.includes(rolUsuario);
 
-    // Bloqueo: Tareas externas no se completan manualmente
     if (tarea.isExternalArea && !esJefeOGerente) {
       return res.status(403).json({ error: "Las tareas externas se cierran automáticamente, no se completan manualmente." });
     }
 
     const asignacionDelUsuario = tarea.asignaciones.find(a => a.usuarioId === usuarioId);
 
-    // Si es un usuario normal (diseñador), actualiza SU asignación
     if (!esJefeOGerente) {
       if (!asignacionDelUsuario) {
         return res.status(403).json({ error: "No tienes esta tarea asignada." });
@@ -48,9 +45,8 @@ export const changeEstadoTarea = async (req: Request, res: Response) => {
         }
       });
 
-      // Evaluar si TODAS las asignaciones ya están completadas
       const asignacionesActualizadas = await prisma.tareaAsignacion.findMany({ where: { tareaId: id } });
-      const todosCompletaron = asignacionesActualizadas.every(a => a.estado === EstadoAsignacion.COMPLETADO);
+      const todosCompletaron = asignacionesActualizadas.length > 0 && asignacionesActualizadas.every(a => a.estado === EstadoAsignacion.COMPLETADO);
       const algunEnProgreso = asignacionesActualizadas.some(a => a.estado === EstadoAsignacion.EN_PROGRESO);
 
       let nuevoEstadoGlobal = tarea.estado;
@@ -70,15 +66,14 @@ export const changeEstadoTarea = async (req: Request, res: Response) => {
       }
 
     } else {
-      // Flujo Jefatura: Forzar estado de la Tarea principal (ej. CERRAR)
       const dataUpdate: any = { estado: estado as EstadoTarea };
       if (estado === EstadoTarea.CERRADO) dataUpdate.cerradoAt = new Date();
+      if (estado === EstadoTarea.COMPLETADO && tarea.estado !== EstadoTarea.COMPLETADO) dataUpdate.completadoAt = new Date();
       
       await prisma.tarea.update({ where: { id }, data: dataUpdate });
       await registrarCambio(id, usuarioId, "estado", tarea.estado, estado);
     }
 
-    // Auto-Cierre o Apertura de Minuta
     if (tarea.minutaId) {
       await evaluarEstadoMinuta(tarea.minutaId);
     }
@@ -87,7 +82,8 @@ export const changeEstadoTarea = async (req: Request, res: Response) => {
       where: { id },
       include: {
         asignaciones: { include: { usuario: { select: { nombre: true, imagen: true } } } },
-        minuta: { select: { id: true, titulo: true, estado: true } }
+        minuta:       { select: { id: true, titulo: true, estado: true } },
+        notas:        { orderBy: { createdAt: "desc" } } // <-- SE INCLUYEN AL DEVOLVER
       }
     });
 

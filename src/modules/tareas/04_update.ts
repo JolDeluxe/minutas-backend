@@ -21,7 +21,6 @@ export const updateTarea = async (req: Request, res: Response) => {
       return res.status(404).json({ error: "Tarea no encontrada" });
     }
 
-    // Validar minuta destino si cambia
     if (datos.minutaId !== undefined && datos.minutaId !== null) {
       const minuta = await prisma.minuta.findUnique({ where: { id: datos.minutaId } });
       if (!minuta) return res.status(404).json({ error: "Minuta no encontrada" });
@@ -30,7 +29,6 @@ export const updateTarea = async (req: Request, res: Response) => {
     const data: Record<string, any> = {};
     const historial: { campo: string; antes: string | null; despues: string | null }[] = [];
 
-    // --- Escalares simples ---
     if (datos.descripcion !== undefined && datos.descripcion !== tareaActual.descripcion) {
       historial.push({ campo: "descripcion", antes: tareaActual.descripcion, despues: datos.descripcion });
       data.descripcion = datos.descripcion;
@@ -69,7 +67,6 @@ export const updateTarea = async (req: Request, res: Response) => {
       data.minutaId = datos.minutaId;
     }
 
-    // --- Area (recalcula isExternalArea) ---
     if (datos.area !== undefined) {
       const val = (datos.area ?? null) as Area | null;
       if (val !== tareaActual.area) {
@@ -79,7 +76,6 @@ export const updateTarea = async (req: Request, res: Response) => {
       }
     }
 
-    // --- FechaVencimiento ---
     if (datos.fechaVencimiento !== undefined) {
       const nuevaFecha  = datos.fechaVencimiento ? new Date(datos.fechaVencimiento) : null;
       const antesStr    = tareaActual.fechaVencimiento?.toISOString() ?? null;
@@ -90,7 +86,6 @@ export const updateTarea = async (req: Request, res: Response) => {
       }
     }
 
-    // --- Responsables ---
     let totalAsignacionesFinal = tareaActual.asignaciones.length;
 
     if (datos.responsables !== undefined) {
@@ -121,7 +116,6 @@ export const updateTarea = async (req: Request, res: Response) => {
       }
     }
 
-    // --- capturaCompleta con valores finales ---
     const clasificacionFinal  = data.clasificacion    !== undefined ? data.clasificacion    : tareaActual.clasificacion;
     const fechaFinal          = data.fechaVencimiento !== undefined ? data.fechaVencimiento : tareaActual.fechaVencimiento;
     
@@ -131,7 +125,6 @@ export const updateTarea = async (req: Request, res: Response) => {
       totalAsignaciones: totalAsignacionesFinal,
     });
 
-    // Validamos si acaba de terminar la captura fase 2 en esta petición
     const recienCapturada = nuevaCapturaCompleta && !tareaActual.capturaCompleta;
 
     if (nuevaCapturaCompleta !== tareaActual.capturaCompleta) {
@@ -142,13 +135,11 @@ export const updateTarea = async (req: Request, res: Response) => {
       await prisma.tarea.update({ where: { id }, data });
     }
 
-    // Guardar el historial de cambios (Faltaba en tu bloque)
     if (historial.length > 0) {
       await Promise.all(historial.map((h) => registrarCambio(id, usuarioId, h.campo, h.antes, h.despues)));
     }
     await registrarAccion("ACTUALIZAR_TAREA", usuarioId, `Tarea ID ${id}`);
 
-    // Si se acaba de terminar de capturar y es de área externa, generar el PDF
     if (recienCapturada && (data.isExternalArea || tareaActual.isExternalArea)) {
         const tareaParaPdf = await prisma.tarea.findUnique({ where: { id } });
         if (tareaParaPdf) {
@@ -163,6 +154,7 @@ export const updateTarea = async (req: Request, res: Response) => {
         asignaciones: { include: { usuario: { select: { id: true, nombre: true, username: true, imagen: true } } } },
         creadoPor:    { select: { id: true, nombre: true, username: true } },
         minuta:       { select: { id: true, titulo: true, estado: true } },
+        notas:        { orderBy: { createdAt: "desc" } } // <-- SE INCLUYEN AL DEVOLVER
       },
     });
 

@@ -18,6 +18,7 @@ export const getTareaById = async (req: Request, res: Response) => {
         },
         creadoPor: { select: { id: true, nombre: true, username: true, imagen: true } },
         minuta:    { select: { id: true, titulo: true, estado: true } },
+        notas:     { orderBy: { createdAt: "desc" } }, // <-- SE INCLUYEN LOS ANEXOS
         historial: {
           orderBy: { createdAt: "desc" },
           take:    20,

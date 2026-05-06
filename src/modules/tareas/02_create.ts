@@ -35,7 +35,6 @@ export const crearTarea = async (req: Request, res: Response) => {
     for (let index = 0; index < tareasPayload.length; index++) {
       const tareaInput = tareasPayload[index];
       
-      // SOLUCIÓN A LOS ERRORES DE TYPESCRIPT: Verificar que el index existe
       if (!tareaInput) continue;
 
       const isExternalArea = calcularIsExternalArea(tareaInput.area as Area | undefined);
@@ -66,6 +65,10 @@ export const crearTarea = async (req: Request, res: Response) => {
             fechaVencimiento: fechaVenc,
             isExternalArea,
             imagenes: { create: imagenesData },
+            // <-- SE GUARDAN LOS ANEXOS EN LA CREACIÓN
+            notas: tareaInput.notas && tareaInput.notas.length > 0 
+              ? { create: tareaInput.notas.map(n => ({ contenido: n.contenido })) } 
+              : undefined,
           },
         });
 
@@ -96,6 +99,7 @@ export const crearTarea = async (req: Request, res: Response) => {
           asignaciones: { include: { usuario: { select: { id: true, nombre: true, username: true, imagen: true } } } },
           creadoPor:    { select: { id: true, nombre: true, username: true } },
           minuta:       { select: { id: true, titulo: true, estado: true } },
+          notas:        { orderBy: { createdAt: "desc" } } // <-- SE INCLUYEN AL RESPONDER
         },
       });
 

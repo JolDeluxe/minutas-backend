@@ -21,9 +21,8 @@ export const listarMinutas = async (req: Request, res: Response) => {
         skip:     offset,
         orderBy:  { fecha: "desc" },
         include: {
-          // Se agrega area y linea para identificar el departamento del creador
           creadoPor: { select: { id: true, nombre: true, username: true, imagen: true, area: true, linea: true } },
-          _count:    { select: { tareas: true } },
+          _count:    { select: { tareas: true, notasGenerales: true } },
         },
       }),
     ]);
