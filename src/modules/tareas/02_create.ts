@@ -10,18 +10,8 @@ import type { CreateTareaInput } from "./zod";
 export const crearTarea = async (req: Request, res: Response) => {
   try {
     const usuarioId = req.user!.id;
-    
-    let tareasPayload: CreateTareaInput[];
-    try {
-      const parsed = JSON.parse(req.body.tareas);
-      tareasPayload = Array.isArray(parsed) ? parsed : [parsed];
-    } catch (e) {
-      tareasPayload = Array.isArray(req.body) ? req.body : [req.body as CreateTareaInput];
-    }
-
-    if (tareasPayload.length === 0) {
-      return res.status(400).json({ error: "No se enviaron tareas para crear" });
-    }
+    // Zod ya lo parseó y validó como Array
+    const tareasPayload = req.body.tareas as CreateTareaInput[]; 
 
     const minutaId = tareasPayload[0]?.minutaId;
     if (minutaId) {

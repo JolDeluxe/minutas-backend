@@ -4,11 +4,11 @@ import { Area, Prioridad, Linea, Clasificacion, EstadoTarea } from "@prisma/clie
 const pre = (val: unknown) =>
   val === "" || val === "null" || val === "undefined" ? undefined : val;
 
-const areaValues     = Object.values(Area)          as [string, ...string[]];
+const areaValues      = Object.values(Area)          as [string, ...string[]];
 const prioridadValues = Object.values(Prioridad)    as [string, ...string[]];
-const lineaValues    = Object.values(Linea)         as [string, ...string[]];
-const clasifValues   = Object.values(Clasificacion) as [string, ...string[]];
-const estadoValues   = Object.values(EstadoTarea)   as [string, ...string[]];
+const lineaValues     = Object.values(Linea)          as [string, ...string[]];
+const clasifValues    = Object.values(Clasificacion) as [string, ...string[]];
+const estadoValues    = Object.values(EstadoTarea)   as [string, ...string[]];
 
 const responsablesField = z.preprocess(
   (val) => {
@@ -25,18 +25,35 @@ const notaTareaInputSchema = z.object({
   contenido: z.string().min(1, "El contenido de la nota es requerido"),
 });
 
+// Schema de una sola tarea (se usa para validar cada elemento del array masivo)
+const singleTareaSchema = z.object({
+  descripcion:      z.string().min(3, "La descripción es requerida"),
+  minutaId:         z.preprocess(pre, z.coerce.number().int().positive().optional()),
+  area:             z.preprocess(pre, z.enum(areaValues).default(Area.DISENO)),
+  prioridad:        z.preprocess(pre, z.enum(prioridadValues).optional()),
+  linea:            z.preprocess(pre, z.enum(lineaValues).optional()),
+  clasificacion:    z.preprocess(pre, z.enum(clasifValues).optional()),
+  fechaVencimiento: z.preprocess(pre, z.string().optional()),
+  responsables:     responsablesField,
+  notas:            z.array(notaTareaInputSchema).optional(), // <-- Permite el array de notas en la creación masiva
+});
+
+// Interceptor masivo: Convierte el String JSON del FormData a un Array de objetos
+const tareasArraySchema = z.preprocess((val) => {
+  if (typeof val === "string") {
+    try {
+      const parsed = JSON.parse(val);
+      return Array.isArray(parsed) ? parsed : [parsed];
+    } catch {
+      return undefined;
+    }
+  }
+  return Array.isArray(val) ? val : [val];
+}, z.array(singleTareaSchema).min(1, "Debes enviar al menos una tarea"));
+
 export const createTareaSchema = z.object({
   body: z.object({
-    descripcion:      z.string().min(3, "La descripción es requerida"),
-    minutaId:         z.preprocess(pre, z.coerce.number().int().positive().optional()),
-    area:             z.preprocess(pre, z.enum(areaValues).default(Area.DISENO)),
-    prioridad:        z.preprocess(pre, z.enum(prioridadValues).optional()),
-    linea:            z.preprocess(pre, z.enum(lineaValues).optional()),
-    clasificacion:    z.preprocess(pre, z.enum(clasifValues).optional()),
-    fechaVencimiento: z.preprocess(pre, z.string().optional()),
-    responsables:     responsablesField,
-    // Se permite enviar un array de notas simples en la creación masiva
-    notas:            z.array(notaTareaInputSchema).optional(),
+    tareas: tareasArraySchema, // <-- Evaluará req.body.tareas
   }),
 });
 
@@ -108,10 +125,10 @@ export const listTareasSchema = z.object({
   }),
 });
 
-export type CreateTareaInput    = z.infer<typeof createTareaSchema>["body"];
-export type UpdateTareaInput    = z.infer<typeof updateTareaSchema>["body"];
-export type UpdateTareaParams   = z.infer<typeof updateTareaSchema>["params"];
-export type CreateNotaGenInput  = z.infer<typeof createNotaGeneralSchema>["body"];
+export type CreateTareaInput     = z.infer<typeof singleTareaSchema>; // <-- Modificado para usar singleTareaSchema
+export type UpdateTareaInput     = z.infer<typeof updateTareaSchema>["body"];
+export type UpdateTareaParams    = z.infer<typeof updateTareaSchema>["params"];
+export type CreateNotaGenInput   = z.infer<typeof createNotaGeneralSchema>["body"];
 export type CreateTareaNotaInput = z.infer<typeof createTareaNotaSchema>["body"];
 export type ChangeEstadoInput    = z.infer<typeof changeEstadoSchema>["body"];
 export type ChangeEstadoParams   = z.infer<typeof changeEstadoSchema>["params"];

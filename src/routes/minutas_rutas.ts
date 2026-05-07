@@ -5,7 +5,7 @@ import { createMinutaSchema, listMinutasSchema, minutaIdSchema } from "../module
 import { listarMinutas } from "../modules/minutas/01_list";
 import { crearMinuta }   from "../modules/minutas/02_create";
 import { getMinutaById } from "../modules/minutas/03_get-by-id";
-import { cerrarMinuta }  from "../modules/minutas/04_close";
+import { cerrarMinuta } from "../modules/minutas/04_close";  
 
 const router = Router();
 router.use(authenticate);

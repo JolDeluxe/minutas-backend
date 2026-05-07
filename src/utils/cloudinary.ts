@@ -7,11 +7,12 @@ cloudinary.config({
   api_secret: env.CLOUDINARY_API_SECRET,
 });
 
+// --- FUNCIÓN RECUPERADA: Para las fotos de perfil de usuario ---
 export const uploadUserProfileImage = async (buffer: Buffer): Promise<string> => {
   const dataUri = `data:image/jpeg;base64,${buffer.toString("base64")}`;
 
   const result = await cloudinary.uploader.upload(dataUri, {
-    folder: "TRACE/Usuarios",
+    folder: "TRACE/Usuarios", // Lo dejo en su carpeta original, o cámbialo si lo deseas
     resource_type: "image",
     transformation: [
       { width: 500, height: 500, crop: "thumb", gravity: "face" },
@@ -23,13 +24,14 @@ export const uploadUserProfileImage = async (buffer: Buffer): Promise<string> =>
   return result.secure_url;
 };
 
+// --- FUNCIONES NUEVAS: Para Tareas y Minutas ---
 export const uploadTaskImage = async (
   buffer: Buffer
 ): Promise<{ url: string; publicId: string }> => {
   const dataUri = `data:image/jpeg;base64,${buffer.toString("base64")}`;
 
   const result = await cloudinary.uploader.upload(dataUri, {
-    folder: "TRACE/Tareas",
+    folder: "minutas-diseño/imagenes", // <-- Carpeta segmentada
     resource_type: "image",
     transformation: [
       { width: 1280, crop: "limit" },
@@ -41,6 +43,25 @@ export const uploadTaskImage = async (
   return { url: result.secure_url, publicId: result.public_id };
 };
 
+export const uploadPdfDocument = async (buffer: Buffer, filename: string): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      {
+        folder: "minutas-diseño/pdf", // <-- Carpeta segmentada
+        resource_type: "image", // "image" permite previsualizar PDFs en el navegador
+        public_id: filename,
+        format: "pdf"
+      },
+      (error, result) => {
+        if (error || !result) reject(error);
+        else resolve(result.secure_url);
+      }
+    );
+    stream.end(buffer);
+  });
+};
+
+// --- ELIMINACIÓN DE ARCHIVOS ---
 export const deleteImageByPublicId = async (publicId: string): Promise<void> => {
   if (!publicId) return;
   try {

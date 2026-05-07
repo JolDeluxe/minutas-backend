@@ -158,6 +158,7 @@ model Tarea {
   // Flags de negocio (calculados por backend al crear/actualizar)
   capturaCompleta Boolean @default(false)
   isExternalArea  Boolean @default(false)
+  pdfUrl          String?  @db.Text
 
   minutaId Int?
   minuta   Minuta? @relation(fields: [minutaId], references: [id], onDelete: SetNull)

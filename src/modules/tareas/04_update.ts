@@ -3,7 +3,6 @@ import { prisma } from "../../db";
 import { Area, Linea, Prioridad, Clasificacion } from "@prisma/client";
 import { registrarAccion, registrarError } from "../../utils/logger";
 import { calcularIsExternalArea, calcularCapturaCompleta, registrarCambio } from "./helpers";
-import { generarPDFTareaExterna } from "./08_generate-pdf";
 import type { UpdateTareaInput, UpdateTareaParams } from "./zod";
 
 export const updateTarea = async (req: Request, res: Response) => {
@@ -125,8 +124,6 @@ export const updateTarea = async (req: Request, res: Response) => {
       totalAsignaciones: totalAsignacionesFinal,
     });
 
-    const recienCapturada = nuevaCapturaCompleta && !tareaActual.capturaCompleta;
-
     if (nuevaCapturaCompleta !== tareaActual.capturaCompleta) {
       data.capturaCompleta = nuevaCapturaCompleta;
     }
@@ -139,13 +136,6 @@ export const updateTarea = async (req: Request, res: Response) => {
       await Promise.all(historial.map((h) => registrarCambio(id, usuarioId, h.campo, h.antes, h.despues)));
     }
     await registrarAccion("ACTUALIZAR_TAREA", usuarioId, `Tarea ID ${id}`);
-
-    if (recienCapturada && (data.isExternalArea || tareaActual.isExternalArea)) {
-        const tareaParaPdf = await prisma.tarea.findUnique({ where: { id } });
-        if (tareaParaPdf) {
-            await generarPDFTareaExterna(tareaParaPdf);
-        }
-    }
 
     const tareaActualizada = await prisma.tarea.findUnique({
       where: { id },
