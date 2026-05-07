@@ -1,28 +1,30 @@
 import type { Request, Response } from "express";
 import { prisma } from "../../db";
-import { EstadoMinuta, Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { registrarError } from "../../utils/logger";
+import { buildMinutasWhere } from "./helpers";
 import type { ListMinutasQuery } from "./zod";
 
 export const listarMinutas = async (req: Request, res: Response) => {
   try {
-    const { page, limit, estado, q } = req.query as unknown as ListMinutasQuery;
-    const offset = (page - 1) * limit;
+    const query              = req.query as unknown as ListMinutasQuery;
+    const { page, limit, sort } = query;
+    const offset             = (page - 1) * limit;
 
-    const where: Prisma.MinutaWhereInput = {};
-    if (estado) where.estado = estado as EstadoMinuta;
-    if (q)      where.titulo = { contains: q };
+    const where = buildMinutasWhere(query);
 
     const [total, minutas] = await prisma.$transaction([
       prisma.minuta.count({ where }),
       prisma.minuta.findMany({
         where,
-        take:     limit,
-        skip:     offset,
-        orderBy:  { fecha: "desc" },
+        take:    limit,
+        skip:    offset,
+        orderBy: sort as Prisma.MinutaOrderByWithRelationInput[],
         include: {
-          creadoPor: { select: { id: true, nombre: true, username: true, imagen: true, area: true, linea: true } },
-          _count:    { select: { tareas: true, notasGenerales: true } },
+          creadoPor: {
+            select: { id: true, nombre: true, username: true, imagen: true, area: true, linea: true },
+          },
+          _count: { select: { tareas: true, notasGenerales: true } },
         },
       }),
     ]);

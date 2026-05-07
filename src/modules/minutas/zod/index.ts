@@ -4,6 +4,27 @@ import { Linea, EstadoMinuta } from "@prisma/client";
 const lineaValues  = Object.values(Linea)        as [string, ...string[]];
 const estadoValues = Object.values(EstadoMinuta) as [string, ...string[]];
 
+const pre = (val: unknown): unknown =>
+  val === "" || val === "null" || val === "undefined" ? undefined : val;
+
+const parseCsv = (val: unknown): unknown => {
+  if (typeof val === "string" && val.trim() !== "")
+    return val.split(",").map((v) => v.trim()).filter(Boolean);
+  if (Array.isArray(val)) return val;
+  return undefined;
+};
+
+const isoFecha = z.preprocess(
+  pre,
+  z
+    .string()
+    .regex(
+      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/,
+      "Formato requerido: ISO 8601 UTC — ej: 2025-01-01T00:00:00.000Z"
+    )
+    .optional()
+);
+
 export const createMinutaSchema = z.object({
   body: z.object({
     titulo:       z.string().min(3, "El título debe tener al menos 3 caracteres").max(200),
@@ -13,10 +34,42 @@ export const createMinutaSchema = z.object({
 
 export const listMinutasSchema = z.object({
   query: z.object({
-    page:   z.coerce.number().min(1).default(1),
-    limit:  z.coerce.number().min(1).max(100).default(20),
-    estado: z.enum(estadoValues).optional(),
-    q:      z.string().optional(),
+    // Búsqueda de texto en título
+    q: z.string().optional(),
+
+    // Filtros multi-valor vía CSV
+    estado:       z.preprocess(parseCsv, z.array(z.enum(estadoValues)).optional()),
+    lineaDefault: z.preprocess(parseCsv, z.array(z.enum(lineaValues)).optional()),
+
+    // Filtro por creador
+    creadoPorId: z.preprocess(pre, z.coerce.number().int().positive().optional()),
+
+    // Rangos de fecha de la minuta (ISO 8601 UTC estricto)
+    fechaDesde: isoFecha,
+    fechaHasta: isoFecha,
+
+    // Paginación
+    page:  z.coerce.number().min(1).default(1),
+    limit: z.coerce.number().min(1).max(100).default(20),
+
+    // Ordenamiento
+    sort: z.preprocess(
+      (val) => {
+        if (typeof val === "string") { try { return JSON.parse(val); } catch { return []; } }
+        return val ?? [];
+      },
+      z
+        .array(
+          z
+            .object({
+              fecha:     z.enum(["asc", "desc"]).optional(),
+              titulo:    z.enum(["asc", "desc"]).optional(),
+              createdAt: z.enum(["asc", "desc"]).optional(),
+            })
+            .strict()
+        )
+        .default([{ fecha: "desc" }])
+    ),
   }),
 });
 

@@ -9,6 +9,7 @@ import {
   tareaIdSchema,
   imagenIdSchema,
   listTareasSchema,
+  deleteTareaSchema,
 } from "../modules/tareas/zod";
 import { listTareas }        from "../modules/tareas/01_list";
 import { crearTarea }        from "../modules/tareas/02_create";
@@ -23,13 +24,12 @@ const router = Router();
 router.use(authenticate);
 
 // GET    /api/tareas
-// Se corrigió "listarTareas" por "listTareas"
 router.get("/",    validate(listTareasSchema),   listTareas);
 
 // POST   /api/tareas  (soporta FormData con hasta 3 imágenes O JSON sin imágenes)
 router.post("/",   upload.array("imagenes", 3), validate(createTareaSchema), crearTarea);
 
-// GET    /api/tareas/:id/pdf (Genera el PDF en Cloudinary y devuelve la URL) <-- NUEVA RUTA
+// GET    /api/tareas/:id/pdf (Genera el PDF en Cloudinary y devuelve la URL)
 router.get("/:id/pdf", validate(tareaIdSchema),  generarPdfTarea);
 
 // GET    /api/tareas/:id
@@ -42,7 +42,7 @@ router.put("/:id", validate(updateTareaSchema),  updateTarea);
 router.patch("/:id/estado",  validate(changeEstadoSchema), changeEstadoTarea);
 
 // DELETE /api/tareas/:id
-router.delete("/:id",        validate(tareaIdSchema),      deleteTarea);
+router.delete("/:id",        validate(deleteTareaSchema),      deleteTarea);
 
 // POST   /api/tareas/:id/imagenes
 router.post("/:id/imagenes", upload.single("imagen"), validate(tareaIdSchema), addImagenTarea);

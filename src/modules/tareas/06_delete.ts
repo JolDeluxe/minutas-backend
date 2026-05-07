@@ -3,16 +3,17 @@ import { prisma } from "../../db";
 import { Rol } from "@prisma/client";
 import { registrarAccion, registrarError } from "../../utils/logger";
 import { deleteImageByPublicId } from "../../utils/cloudinary";
-import type { TareaIdParams } from "./zod";
+import type { DeleteTareaParams } from "./zod";
 
 export const deleteTarea = async (req: Request, res: Response) => {
   try {
     const usuarioId = req.user!.id;
-    const { id }    = req.params as unknown as TareaIdParams;
+    const rolUsuario = req.user!.rol;    
+    // Zod ya parseó esto a número positivo gracias al coerce
+    const { id } = req.params as unknown as DeleteTareaParams;
 
-    // Corrección del error de TS tipando el arreglo explícitamente
     const rolesPermitidos: Rol[] = [Rol.GERENCIA, Rol.JEFE];
-    if (!rolesPermitidos.includes(req.user!.rol)) {
+    if (!rolesPermitidos.includes(rolUsuario)) {
       return res.status(403).json({ error: "Solo GERENCIA o JEFE pueden eliminar tareas" });
     }
 
@@ -32,11 +33,11 @@ export const deleteTarea = async (req: Request, res: Response) => {
 
     await prisma.tarea.delete({ where: { id } });
 
-    await registrarAccion("ELIMINAR_TAREA", usuarioId, `Tarea ID ${id}`);
+    await registrarAccion("HARD_DELETE_TAREA", usuarioId, `Eliminación física. Tarea ID ${id}`);
 
-    return res.json({ status: "success", message: "Tarea eliminada correctamente" });
+    return res.json({ status: "success", message: "Registro destruido y auditado correctamente" });
   } catch (error) {
-    await registrarError("ELIMINAR_TAREA", req.user?.id ?? null, error);
-    return res.status(500).json({ error: "Error al eliminar tarea" });
+    await registrarError("HARD_DELETE_TAREA", req.user?.id ?? null, error);
+    return res.status(500).json({ error: "Error interno al eliminar la tarea" });
   }
 };
