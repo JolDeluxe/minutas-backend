@@ -9,7 +9,6 @@ export const deleteTarea = async (req: Request, res: Response) => {
   try {
     const usuarioId = req.user!.id;
     const rolUsuario = req.user!.rol;    
-    // Zod ya parseó esto a número positivo gracias al coerce
     const { id } = req.params as unknown as DeleteTareaParams;
 
     const rolesPermitidos: Rol[] = [Rol.GERENCIA, Rol.JEFE];
