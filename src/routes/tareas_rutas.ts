@@ -21,33 +21,36 @@ import { addImagenTarea, deleteImagenTarea } from "../modules/tareas/07_imagenes
 import { generarPdfTarea }   from "../modules/tareas/08_generate-pdf";
 
 const router = Router();
+
+// Aplicar autenticación global para todo el dominio de tareas
 router.use(authenticate);
 
-// GET    /api/tareas
-router.get("/",    validate(listTareasSchema),   listTareas);
+// Listado de tareas con filtros dinámicos
+router.get("/", validate(listTareasSchema), listTareas);
 
-// POST   /api/tareas  (soporta FormData con hasta 3 imágenes O JSON sin imágenes)
-router.post("/",   upload.array("imagenes", 3), validate(createTareaSchema), crearTarea);
+// Creación masiva o individual (Soporta FormData para imágenes)
+router.post("/", upload.array("imagenes", 3), validate(createTareaSchema), crearTarea);
 
-// GET    /api/tareas/:id/pdf (Genera el PDF en Cloudinary y devuelve la URL)
-router.get("/:id/pdf", validate(tareaIdSchema),  generarPdfTarea);
+// Obtener detalle por ID
+router.get("/:id", validate(tareaIdSchema), getTareaById);
 
-// GET    /api/tareas/:id
-router.get("/:id", validate(tareaIdSchema),      getTareaById);
+// Generar PDF de evidencia en Cloudinary
+router.get("/:id/pdf", validate(tareaIdSchema), generarPdfTarea);
 
-// PUT    /api/tareas/:id
-router.put("/:id", validate(updateTareaSchema),  updateTarea);
+// Actualización de campos de dominio
+router.put("/:id", validate(updateTareaSchema), updateTarea);
 
-// PATCH  /api/tareas/:id/estado
-router.patch("/:id/estado",  validate(changeEstadoSchema), changeEstadoTarea);
+// Cambio de estado (Workflow)
+router.patch("/:id/estado", validate(changeEstadoSchema), changeEstadoTarea);
 
-// DELETE /api/tareas/:id
-router.delete("/:id",        validate(deleteTareaSchema),      deleteTarea);
+/**
+ * Ruta Crítica: Eliminación Física
+ * El middleware de validación usa deleteTareaSchema para asegurar tipos numéricos.
+ */
+router.delete("/:id", validate(deleteTareaSchema), deleteTarea);
 
-// POST   /api/tareas/:id/imagenes
+// Gestión modular de imágenes post-creación
 router.post("/:id/imagenes", upload.single("imagen"), validate(tareaIdSchema), addImagenTarea);
-
-// DELETE /api/tareas/:id/imagenes/:imagenId
 router.delete("/:id/imagenes/:imagenId", validate(imagenIdSchema), deleteImagenTarea);
 
 export default router;

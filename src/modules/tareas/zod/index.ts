@@ -120,82 +120,54 @@ export const imagenIdSchema = z.object({
   }),
 });
 
-// Se usa coerce para asegurar que Prisma reciba un entero en el controlador
 export const deleteTareaSchema = z.object({
   params: z.object({
-    id: z.coerce.number().int().positive("El ID debe ser numérico")
-  })
-});
+    id: z.coerce.number().int().positive("El ID debe ser un número válido"),
+  }),
+}).strict();
 
 export const listTareasSchema = z.object({
   query: z.object({
-    // Búsqueda de texto
     q: z.string().optional(),
-
-    // Filtros multi-valor vía CSV (?estado=PENDIENTE,EN_PROGRESO)
     estado:       z.preprocess(parseCsv, z.array(z.enum(estadoValues)).optional()),
     area:         z.preprocess(parseCsv, z.array(z.enum(areaValues)).optional()),
     linea:        z.preprocess(parseCsv, z.array(z.enum(lineaValues)).optional()),
     clasificacion: z.preprocess(parseCsv, z.array(z.enum(clasifValues)).optional()),
     prioridad:    z.preprocess(parseCsv, z.array(z.enum(prioridadValues)).optional()),
-
-    // Filtros de ID
     minutaId:      z.preprocess(pre, z.coerce.number().int().positive().optional()),
     creadoPorId:   z.preprocess(pre, z.coerce.number().int().positive().optional()),
     responsableId: z.preprocess(pre, z.coerce.number().int().positive().optional()),
-
-    // Filtros booleanos
-    isExternalArea:  z.preprocess(
-      (v) => (v === "true" ? true : v === "false" ? false : undefined),
-      z.boolean().optional()
-    ),
-    capturaCompleta: z.preprocess(
-      (v) => (v === "true" ? true : v === "false" ? false : undefined),
-      z.boolean().optional()
-    ),
-
-    // Rangos de fecha (ISO 8601 UTC estricto)
+    isExternalArea:  z.preprocess((v) => (v === "true" ? true : v === "false" ? false : undefined), z.boolean().optional()),
+    capturaCompleta: z.preprocess((v) => (v === "true" ? true : v === "false" ? false : undefined), z.boolean().optional()),
     createdDesde:      isoFecha,
     createdHasta:      isoFecha,
     vencimientoDesde:  isoFecha,
     vencimientoHasta:  isoFecha,
     completadoDesde:   isoFecha,
     completadoHasta:   isoFecha,
-
-    // Paginación
     page:  z.coerce.number().min(1).default(1),
     limit: z.coerce.number().min(1).max(100).default(20),
-
-    // Ordenamiento
     sort: z.preprocess(
       (val) => {
         if (typeof val === "string") { try { return JSON.parse(val); } catch { return []; } }
         return val ?? [];
       },
-      z
-        .array(
-          z
-            .object({
-              createdAt:        z.enum(["asc", "desc"]).optional(),
-              fechaVencimiento: z.enum(["asc", "desc"]).optional(),
-              completadoAt:     z.enum(["asc", "desc"]).optional(),
-              prioridad:        z.enum(["asc", "desc"]).optional(),
-              estado:           z.enum(["asc", "desc"]).optional(),
-            })
-            .strict()
-        )
-        .default([{ createdAt: "desc" }])
+      z.array(z.object({
+        createdAt: z.enum(["asc", "desc"]).optional(),
+        fechaVencimiento: z.enum(["asc", "desc"]).optional(),
+        completadoAt: z.enum(["asc", "desc"]).optional(),
+        prioridad: z.enum(["asc", "desc"]).optional(),
+        estado: z.enum(["asc", "desc"]).optional(),
+      }).strict()).default([{ createdAt: "desc" }])
     ),
   }),
 });
 
 export type CreateTareaInput     = z.infer<typeof singleTareaSchema>;
 export type UpdateTareaInput     = z.infer<typeof updateTareaSchema>["body"];
-export type UpdateTareaParams    = z.infer<typeof updateTareaSchema>["params"];
 export type CreateNotaGenInput   = z.infer<typeof createNotaGeneralSchema>["body"];
 export type CreateTareaNotaInput = z.infer<typeof createTareaNotaSchema>["body"];
 export type ChangeEstadoInput    = z.infer<typeof changeEstadoSchema>["body"];
-export type ChangeEstadoParams   = z.infer<typeof changeEstadoSchema>["params"];
 export type TareaIdParams        = z.infer<typeof tareaIdSchema>["params"];
 export type ImagenIdParams       = z.infer<typeof imagenIdSchema>["params"];
 export type ListTareasQuery      = z.infer<typeof listTareasSchema>["query"];
