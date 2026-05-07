@@ -1,59 +1,53 @@
 import { Router } from "express";
 import { authenticate } from "../middlewares/authenticate";
-import { authorize } from "../middlewares/authorize";
 import { validate } from "../middlewares/validate";
-import { Rol } from "@prisma/client";
-import { dashboardFiltrosSchema, tecnicoDetalleParamsSchema } from "../modules/dashboard/zod";
-import { getKpisGeneral }    from "../modules/dashboard/01_kpis_general";
-import { getKpisArea }       from "../modules/dashboard/02_kpis_area";
-import { getKpisEquipo }     from "../modules/dashboard/03_kpis_equipo";
-import { getTecnicoDetalle } from "../modules/dashboard/04_tecnico_detalle";
-import { getKpiPrincipal }  from "../modules/dashboard/05_kpi_principal";
+import { dashboardFiltrosSchema } from "../modules/dashboard/zod";
+import {
+  getDashboardMetricas,
+  getKpisArea,
+  getKpisEquipo,
+  getKpisGeneral,
+  getKpiPrincipal,
+} from "../modules/dashboard/01_metrcias_principal";
 
 const router = Router();
 router.use(authenticate);
 
-const rolesReportes  = [Rol.SUPER_ADMIN, Rol.JEFE_MTTO, Rol.COORDINADOR_MTTO];
-const rolesPrincipal = [Rol.SUPER_ADMIN, Rol.JEFE_MTTO, Rol.COORDINADOR_MTTO, Rol.TECNICO];
+// Endpoint consolidado: general + por minuta + por fecha
+router.get("/", validate(dashboardFiltrosSchema), getDashboardMetricas);
 
-// GET /api/dashboard/kpis/principal
-// DEBE ir antes de rutas parametrizadas /:id
+// Vista principal del periodo actual (o del filtro recibido)
 router.get(
   "/kpis/principal",
-  authorize(rolesPrincipal),
+  validate(dashboardFiltrosSchema),
   getKpiPrincipal
 );
 
-// GET /api/dashboard/kpis/general
+// Métrica general
 router.get(
   "/kpis/general",
-  authorize(rolesReportes),
   validate(dashboardFiltrosSchema),
   getKpisGeneral
 );
 
-// GET /api/dashboard/kpis/area
+// Métricas por minuta
 router.get(
-  "/kpis/area",
-  authorize(rolesReportes),
+  "/kpis/minuta",
   validate(dashboardFiltrosSchema),
   getKpisArea
 );
 
-// GET /api/dashboard/kpis/equipo
+// Alias de compatibilidad
+router.get("/kpis/area", validate(dashboardFiltrosSchema), getKpisArea);
+
+// Métricas por fecha
 router.get(
-  "/kpis/equipo",
-  authorize(rolesReportes),
+  "/kpis/fechas",
   validate(dashboardFiltrosSchema),
   getKpisEquipo
 );
 
-// GET /api/dashboard/tecnico/:id/kpis
-router.get(
-  "/tecnico/:id/kpis",
-  authorize([...rolesReportes, Rol.TECNICO]), // <-- Corrección aquí
-  validate(tecnicoDetalleParamsSchema),
-  getTecnicoDetalle
-);
+// Alias de compatibilidad
+router.get("/kpis/equipo", validate(dashboardFiltrosSchema), getKpisEquipo);
 
 export default router;

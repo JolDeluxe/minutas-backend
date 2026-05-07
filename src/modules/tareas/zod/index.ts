@@ -11,16 +11,9 @@ const parseCsv = (val: unknown): unknown => {
   return undefined;
 };
 
-const isoFecha = z.preprocess(
-  pre,
-  z
-    .string()
-    .regex(
-      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/,
-      "Formato requerido: ISO 8601 UTC — ej: 2025-01-01T00:00:00.000Z"
-    )
-    .optional()
-);
+const isoFecha = z.coerce.date({ 
+  message: "Fecha inválida" 
+}).optional();
 
 const areaValues      = Object.values(Area)          as [string, ...string[]];
 const prioridadValues = Object.values(Prioridad)     as [string, ...string[]];
@@ -47,7 +40,7 @@ const singleTareaSchema = z.object({
   prioridad:        z.preprocess(pre, z.enum(prioridadValues).optional()),
   linea:            z.preprocess(pre, z.enum(lineaValues).optional()),
   clasificacion:    z.preprocess(pre, z.enum(clasifValues).optional()),
-  fechaVencimiento: z.preprocess(pre, z.string().optional()),
+  fechaVencimiento: z.preprocess(pre, z.coerce.date({ message: "Fecha de vencimiento inválida" }).optional()),
   responsables:     responsablesField,
   notas:            z.array(notaTareaInputSchema).optional(),
 });
@@ -78,7 +71,7 @@ export const updateTareaSchema = z.object({
     prioridad:        z.preprocess(pre, z.enum(prioridadValues).nullable().optional()),
     linea:            z.preprocess(pre, z.enum(lineaValues).nullable().optional()),
     clasificacion:    z.preprocess(pre, z.enum(clasifValues).nullable().optional()),
-    fechaVencimiento: z.preprocess(pre, z.string().nullable().optional()),
+    fechaVencimiento: z.preprocess(pre, z.coerce.date({ message: "Fecha de vencimiento inválida" }).nullable().optional()),
     minutaId:         z.preprocess(pre, z.coerce.number().int().positive().nullable().optional()),
     responsables:     responsablesField,
   }),

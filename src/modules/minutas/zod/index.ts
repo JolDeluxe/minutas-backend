@@ -14,16 +14,9 @@ const parseCsv = (val: unknown): unknown => {
   return undefined;
 };
 
-const isoFecha = z.preprocess(
-  pre,
-  z
-    .string()
-    .regex(
-      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/,
-      "Formato requerido: ISO 8601 UTC — ej: 2025-01-01T00:00:00.000Z"
-    )
-    .optional()
-);
+const isoFecha = z.coerce.date({ 
+  message: "Fecha inválida" 
+}).optional();
 
 export const createMinutaSchema = z.object({
   body: z.object({
