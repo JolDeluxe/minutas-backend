@@ -20,7 +20,6 @@ export const marcarComoLeida = async (req: Request, res: Response) => {
     });
 
     return res.json({ status: "success", data: actualizada });
-
   } catch (error) {
     await registrarError("MARK_NOTIF_READ", req.user?.id ?? null, error);
     return res.status(500).json({ error: "Error al marcar notificación" });
@@ -36,8 +35,10 @@ export const marcarTodasComoLeidas = async (req: Request, res: Response) => {
       data: { leida: true },
     });
 
-    return res.json({ status: "success", message: "Todas las notificaciones marcadas como leídas" });
-
+    return res.json({
+      status: "success",
+      message: "Todas las notificaciones marcadas como leídas",
+    });
   } catch (error) {
     await registrarError("MARK_ALL_READ", req.user?.id ?? null, error);
     return res.status(500).json({ error: "Error al marcar notificaciones" });
@@ -61,7 +62,6 @@ export const marcarComoAccionada = async (req: Request, res: Response) => {
     });
 
     return res.json({ status: "success", data: actualizada });
-
   } catch (error) {
     await registrarError("MARK_NOTIF_ACTIONED", req.user?.id ?? null, error);
     return res.status(500).json({ error: "Error al marcar notificación como accionada" });

@@ -13,19 +13,16 @@ export const listarNotificaciones = async (req: Request, res: Response) => {
 
     const whereClause: Record<string, unknown> = { usuarioId };
     if (soloNoLeidas) whereClause.leida = false;
-    if (tipo)         whereClause.tipo  = tipo;
+    if (tipo) whereClause.tipo = tipo;
 
     const [total, noLeidas, notificaciones] = await Promise.all([
       prisma.notificacion.count({ where: whereClause }),
       prisma.notificacion.count({ where: { usuarioId, leida: false } }),
       prisma.notificacion.findMany({
-        where:   whereClause,
-        take:    limit,
-        skip:    offset,
-        orderBy: [
-          { createdAt: "desc" },
-          { id: "desc" } // Desempate determinista
-        ],
+        where: whereClause,
+        take: limit,
+        skip: offset,
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
         include: {
           tarea: { select: { estado: true } },
         },
@@ -38,7 +35,6 @@ export const listarNotificaciones = async (req: Request, res: Response) => {
       noLeidas,
       data: notificaciones,
     });
-
   } catch (error) {
     await registrarError("LIST_NOTIFICACIONES", req.user?.id ?? null, error);
     return res.status(500).json({ error: "Error al obtener notificaciones" });

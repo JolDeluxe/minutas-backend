@@ -90,9 +90,11 @@ model Usuario {
   tareasCreadas  Tarea[]              @relation("TareaCreador")
   asignaciones   TareaAsignacion[]
   historial      TareaHistorial[]
-  bitacoras      Bitacora[]
-  refreshTokens  RefreshToken[]
-  resetTokens    PasswordResetToken[]
+  bitacoras         Bitacora[]
+  refreshTokens     RefreshToken[]
+  resetTokens       PasswordResetToken[]
+  notificaciones    Notificacion[]
+  pushSubscriptions PushSubscription[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -166,10 +168,11 @@ model Tarea {
   creadoPorId Int
   creadoPor   Usuario @relation("TareaCreador", fields: [creadoPorId], references: [id], onDelete: Restrict)
 
-  imagenes     TareaImagen[]
-  asignaciones TareaAsignacion[]
-  historial    TareaHistorial[]
-  notas        TareaNota[] // <--- SE AGREGAN LOS ANEXOS A LA TAREA
+  imagenes       TareaImagen[]
+  asignaciones   TareaAsignacion[]
+  historial      TareaHistorial[]
+  notas          TareaNota[]
+  notificaciones Notificacion[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -288,6 +291,56 @@ model PasswordResetToken {
   usuarioId Int
   usuario   Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
   expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([usuarioId])
+}
+
+// ─── NOTIFICACIONES ──────────────────────────────────────
+
+enum TipoNotificacion {
+  NUEVAS_TAREAS
+  TAREA_ASIGNADA
+  TAREA_COMPLETADA
+  TAREA_CERRADA
+  TAREA_MODIFICADA
+  REVISION_PENDIENTE
+  VENCIMIENTO_PROXIMO
+  LINEA_CAMBIADA
+}
+
+model Notificacion {
+  id        Int              @id @default(autoincrement())
+  tipo      TipoNotificacion
+  titulo    String           @db.VarChar(150)
+  cuerpo    String           @db.Text
+  leida     Boolean          @default(false)
+  accionada Boolean          @default(false)
+
+  usuarioId Int
+  usuario   Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  tareaId Int?
+  tarea   Tarea?  @relation(fields: [tareaId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([usuarioId])
+  @@index([leida])
+  @@index([tareaId])
+}
+
+model PushSubscription {
+  id       Int    @id @default(autoincrement())
+  endpoint String @unique @db.VarChar(500)
+  p256dh   String @db.VarChar(300)
+  auth     String @db.VarChar(100)
+
+  usuarioId    Int
+  usuario      Usuario   @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  lastSuccess  DateTime?
+  failureCount Int       @default(0)
+
   createdAt DateTime @default(now())
 
   @@index([usuarioId])

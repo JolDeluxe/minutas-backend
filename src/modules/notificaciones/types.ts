@@ -1,11 +1,4 @@
-import type { Tarea, Usuario } from "@prisma/client";
-
-export interface NotificationPayload {
-  title: string;
-  body: string;
-  url?: string;
-  icon?: string;
-}
+import type { Tarea, Usuario, TareaAsignacion, Linea } from "@prisma/client";
 
 export interface PayloadBase {
   titulo: string;
@@ -13,8 +6,10 @@ export interface PayloadBase {
   url: string;
 }
 
-// Tipo extendido para asegurar que la tarea traiga sus relaciones necesarias
 export type TareaConRelaciones = Tarea & {
-  creador?: Usuario | null;
-  responsables?: Usuario[];
+  asignaciones?: (TareaAsignacion & {
+    usuario: Pick<Usuario, "id" | "nombre">;
+  })[];
+  creadoPor?: Pick<Usuario, "id" | "nombre"> | null;
+  minuta?: { id: number; titulo: string } | null;
 };
