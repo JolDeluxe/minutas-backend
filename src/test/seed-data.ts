@@ -1,188 +1,455 @@
-import { PrismaClient, Area, Linea, Clasificacion, Prioridad, EstadoTarea, EstadoAsignacion, EstadoMinuta, Rol } from "@prisma/client";
+// minutas-backend/src/test/seed-data.ts
+
+import {
+  PrismaClient,
+  Area,
+  Linea,
+  Clasificacion,
+  Prioridad,
+  EstadoTarea,
+  EstadoAsignacion,
+  EstadoMinuta,
+  EstadoConceptual,
+  EstadoOperativo,
+  Rol,
+} from "@prisma/client";
 
 const prisma = new PrismaClient();
 
-// ─── UTILIDADES Y DATOS ALEATORIOS ──────────────────────────────
-const randomInt = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min;
-// Se le agrega "!" para asegurarle a TypeScript que nunca devolverá undefined
-const randomElement = <T>(arr: T[]): T => arr[randomInt(0, arr.length - 1)]!;
+const randomInt = (
+  min: number,
+  max: number
+) =>
+  Math.floor(
+    Math.random() * (max - min + 1)
+  ) + min;
 
-const generarFechaAleatoria = (inicio: Date, fin: Date) => {
-  return new Date(inicio.getTime() + Math.random() * (fin.getTime() - inicio.getTime()));
+const randomElement = <T>(
+  arr: T[]
+): T =>
+  arr[
+    randomInt(0, arr.length - 1)
+  ]!;
+
+const generarFechaAleatoria = (
+  inicio: Date,
+  fin: Date
+) => {
+  return new Date(
+    inicio.getTime() +
+      Math.random() *
+        (fin.getTime() -
+          inicio.getTime())
+  );
 };
 
-// Fechas para la simulación: 1 de Febrero al día de hoy
-const FECHA_INICIO = new Date("2026-02-01T08:00:00Z");
-const FECHA_FIN = new Date(); // Hoy
+const FECHA_INICIO =
+  new Date("2026-02-01T08:00:00Z");
 
-const lineas = Object.values(Linea);
-const areas = Object.values(Area);
-const clasificaciones = Object.values(Clasificacion);
-const prioridades = Object.values(Prioridad);
+const FECHA_FIN = new Date();
 
-const verbos = ["Revisar", "Diseñar", "Analizar", "Corregir", "Investigar", "Preparar muestra de", "Aprobar", "Modificar"];
-const objetos = ["suela de bota vaquera", "herraje para bolso", "patrón de chamarra de piel", "render de tienda", "caja de empaque", "logo para nueva línea", "horma de calzado", "política de calidad"];
-const complementos = ["para la próxima temporada.", "urgente para el Sr. Cuadra.", "según comentarios de la última junta.", "para presentación con clientes.", "antes de pasarlo a producción.", "para la colección de invierno."];
+const lineas =
+  Object.values(Linea);
 
-const generarDescripcion = () => `${randomElement(verbos)} ${randomElement(objetos)} ${randomElement(complementos)}`;
-const generarTituloMinuta = () => `Junta de Revisión - ${randomElement(["Avances", "Diseño", "Estrategia", "Producción"])} ${randomInt(100, 999)}`;
+const clasificaciones =
+  Object.values(
+    Clasificacion
+  );
+
+const prioridades =
+  Object.values(Prioridad);
+
+const verbos = [
+  "Analizar",
+  "Corregir",
+  "Investigar",
+  "Diseñar",
+  "Validar",
+  "Preparar",
+  "Ajustar",
+  "Modificar",
+];
+
+const objetos = [
+  "suela de bota",
+  "render de tienda",
+  "muestra de piel",
+  "patrón de chamarra",
+  "política de calidad",
+  "empaque de lujo",
+  "herraje metálico",
+  "costura lateral",
+];
+
+const complementos = [
+  "para próxima junta",
+  "antes de producción",
+  "urgente para dirección",
+  "según comentarios del dueño",
+  "para validación comercial",
+  "para pruebas de calidad",
+];
+
+const generarDescripcion =
+  () =>
+    `${randomElement(
+      verbos
+    )} ${randomElement(
+      objetos
+    )} ${randomElement(
+      complementos
+    )}`;
+
+const generarTituloMinuta =
+  () =>
+    `Junta Ejecutiva ${randomInt(
+      100,
+      999
+    )}`;
 
 async function main() {
-  console.log("🌱 Iniciando el sembrado de datos (Seeding)...");
+  console.log(
+    "🌱 Generando data organizacional..."
+  );
 
-  // 1. CREAR USUARIOS DE PRUEBA (Si no existen)
-  console.log("👤 Generando usuarios de prueba...");
-  const usuariosFalsos = [
-    { nombre: "Gerente Diseño", username: "gerente_d", email: "gerente@empresa.com", rol: Rol.GERENCIA, area: Area.DISENO },
-    { nombre: "Jefe Bota", username: "jefe_bota", email: "bota@empresa.com", rol: Rol.JEFE, area: Area.DISENO, linea: Linea.BOTA },
-    { nombre: "Jefe Calzado", username: "jefe_calzado", email: "calzado@empresa.com", rol: Rol.JEFE, area: Area.DISENO, linea: Linea.CALZADO },
-    { nombre: "Diseñador Ana", username: "ana_diseno", email: "ana@empresa.com", rol: Rol.COORDINADOR, area: Area.DISENO, linea: Linea.BOTA },
-    { nombre: "Diseñador Juan", username: "juan_diseno", email: "juan@empresa.com", rol: Rol.COORDINADOR, area: Area.DISENO, linea: Linea.CALZADO },
-    { nombre: "Diseñador Emma", username: "emma_diseno", email: "emma@empresa.com", rol: Rol.COORDINADOR, area: Area.DISENO, linea: Linea.ROPA },
-  ];
-
-  const usuariosCreados = [];
-  for (const u of usuariosFalsos) {
-    const user = await prisma.usuario.upsert({
-      where: { username: u.username },
-      update: {},
-      create: {
-        nombre: u.nombre,
-        username: u.username,
-        email: u.email,
-        password: "password123", 
-        rol: u.rol,
-        area: u.area,
-        linea: u.linea,
-      }
+  const usuarios =
+    await prisma.usuario.findMany({
+      where: {
+        area: Area.DISENO,
+      },
     });
-    usuariosCreados.push(user);
+
+  if (
+    usuarios.length === 0
+  ) {
+    throw new Error(
+      "Primero ejecuta user-test.ts"
+    );
   }
 
-  // Se agrega "!" al final para asegurarle a TS que encontraremos un usuario
-  const creadorMinutas = (usuariosCreados.find(u => u.rol === Rol.GERENCIA) || usuariosCreados[0])!;
-  const disenadores = usuariosCreados.filter(u => u.rol === Rol.COORDINADOR);
+  const gerencia =
+    usuarios.find(
+      (u) =>
+        u.rol ===
+        Rol.GERENCIA
+    );
 
-  // 2. CREAR MINUTAS (30 minutas distribuidas en los últimos meses)
-  console.log("📝 Generando 30 minutas con sus tareas...");
-  let totalTareasCreadas = 0;
+  if (!gerencia) {
+    throw new Error(
+      "No existe usuario GERENCIA"
+    );
+  }
 
-  for (let i = 0; i < 30; i++) {
-    const fechaMinuta = generarFechaAleatoria(FECHA_INICIO, FECHA_FIN);
-    const cantidadTareas = randomInt(2, 12); 
-    
-    const esReciente = (FECHA_FIN.getTime() - fechaMinuta.getTime()) < (15 * 24 * 60 * 60 * 1000); 
-    
-    const minuta = await prisma.minuta.create({
-      data: {
-        titulo: generarTituloMinuta(),
-        lineaDefault: randomElement(lineas),
-        fecha: fechaMinuta,
-        estado: esReciente ? EstadoMinuta.ACTIVA : EstadoMinuta.CERRADA,
-        creadoPorId: creadorMinutas.id,
-        createdAt: fechaMinuta,
-      }
-    });
+  const responsables =
+    usuarios.filter(
+      (u) =>
+        u.rol ===
+          Rol.COORDINADOR ||
+        u.rol === Rol.JEFE
+    );
 
-    // 3. CREAR TAREAS PARA LA MINUTA
-    for (let j = 0; j < cantidadTareas; j++) {
-      const isExternal = Math.random() > 0.85; 
-      const areaTarea = isExternal ? randomElement([Area.DIRECCION_MBC, Area.DIRECCION_CFI, Area.DIRECCION_ADJUNTA, Area.DIRECCION_TIENDAS]) : Area.DISENO;
-      
-      const diasParaVencer = randomInt(1, 15);
-      const fechaVencimiento = new Date(fechaMinuta);
-      fechaVencimiento.setDate(fechaVencimiento.getDate() + diasParaVencer);
+  let totalTareas = 0;
 
-      // CORRECCIÓN: Tipado explícito para evitar error de TypeScript
-      let estadoTarea: EstadoTarea = EstadoTarea.PENDIENTE;
-      let fechaCompletado: Date | null = null;
-      let fechaCerrado: Date | null = null;
+  for (
+    let i = 0;
+    i < 35;
+    i++
+  ) {
+    const fechaMinuta =
+      generarFechaAleatoria(
+        FECHA_INICIO,
+        FECHA_FIN
+      );
 
-      if (!esReciente || Math.random() > 0.3) {
-        estadoTarea = randomElement([EstadoTarea.COMPLETADO, EstadoTarea.CERRADO, EstadoTarea.EN_PROGRESO]);
-        
-        if (estadoTarea === EstadoTarea.COMPLETADO || estadoTarea === EstadoTarea.CERRADO) {
-          const aTiempo = Math.random() > 0.4; 
-          
-          fechaCompletado = new Date(fechaVencimiento);
-          if (aTiempo) {
-             fechaCompletado.setDate(fechaCompletado.getDate() - randomInt(1, 3)); 
-          } else {
-             fechaCompletado.setDate(fechaCompletado.getDate() + randomInt(1, 10)); 
-          }
-
-          if (estadoTarea === EstadoTarea.CERRADO) {
-            fechaCerrado = new Date(fechaCompletado);
-            fechaCerrado.setDate(fechaCerrado.getDate() + randomInt(1, 5)); 
-          }
-        }
-      }
-
-      if (isExternal && estadoTarea !== EstadoTarea.PENDIENTE) {
-         estadoTarea = EstadoTarea.CERRADO;
-         fechaCompletado = null;
-         fechaCerrado = new Date(fechaMinuta);
-         fechaCerrado.setDate(fechaCerrado.getDate() + randomInt(1, 5));
-      }
-
-      const tarea = await prisma.tarea.create({
+    const minuta =
+      await prisma.minuta.create({
         data: {
-          descripcion: generarDescripcion(),
-          area: areaTarea,
-          prioridad: randomElement(prioridades),
-          linea: randomElement(lineas),
-          clasificacion: randomElement(clasificaciones),
-          fechaVencimiento,
-          estado: estadoTarea,
-          completadoAt: fechaCompletado,
-          cerradoAt: fechaCerrado,
-          capturaCompleta: true, 
-          isExternalArea: isExternal,
-          minutaId: minuta.id,
-          creadoPorId: creadorMinutas.id,
-          createdAt: fechaMinuta,
-        }
+          titulo:
+            generarTituloMinuta(),
+
+          lineaDefault:
+            randomElement(
+              lineas
+            ),
+
+          estado:
+            Math.random() >
+            0.5
+              ? EstadoMinuta.ACTIVA
+              : EstadoMinuta.CERRADA,
+
+          fecha:
+            fechaMinuta,
+
+          createdAt:
+            fechaMinuta,
+
+          creadoPorId:
+            gerencia.id,
+        },
       });
 
-      // 4. CREAR ASIGNACIONES (Solo si es interna)
-      if (!isExternal) {
-        const numAsignados = randomElement([1, 1, 2]); 
-        const asignados = [...disenadores].sort(() => 0.5 - Math.random()).slice(0, numAsignados);
+    const totalEntradas =
+      randomInt(5, 20);
+
+    for (
+      let j = 0;
+      j < totalEntradas;
+      j++
+    ) {
+      const fechaVencimiento =
+        new Date(
+          fechaMinuta
+        );
+
+      fechaVencimiento.setDate(
+        fechaVencimiento.getDate() +
+          randomInt(2, 20)
+      );
+
+      let estado:
+        | EstadoTarea =
+        EstadoTarea.PENDIENTE;
+
+      const randomEstado =
+        Math.random();
+
+      if (
+        randomEstado > 0.75
+      ) {
+        estado =
+          EstadoTarea.CERRADO;
+      } else if (
+        randomEstado > 0.5
+      ) {
+        estado =
+          EstadoTarea.COMPLETADO;
+      } else if (
+        randomEstado > 0.25
+      ) {
+        estado =
+          EstadoTarea.EN_PROGRESO;
+      }
+
+      let completadoAt:
+        | Date
+        | null = null;
+
+      let cerradoAt:
+        | Date
+        | null = null;
+
+      if (
+        estado ===
+          EstadoTarea.COMPLETADO ||
+        estado ===
+          EstadoTarea.CERRADO
+      ) {
+        completadoAt =
+          generarFechaAleatoria(
+            fechaMinuta,
+            fechaVencimiento
+          );
+      }
+
+      if (
+        estado ===
+        EstadoTarea.CERRADO
+      ) {
+        cerradoAt =
+          generarFechaAleatoria(
+            fechaVencimiento,
+            new Date()
+          );
+      }
+
+      const esExterna =
+        Math.random() > 0.8;
+
+      const tarea =
+        await prisma.tarea.create({
+          data: {
+            descripcion:
+              generarDescripcion(),
+
+            area: esExterna
+              ? Area.DIRECCION_CFI
+              : Area.DISENO,
+
+            linea:
+              randomElement(
+                lineas
+              ),
+
+            prioridad:
+              randomElement(
+                prioridades
+              ),
+
+            clasificacion:
+              randomElement(
+                clasificaciones
+              ),
+
+            fechaVencimiento,
+
+            capturaCompleta:
+              true,
+
+            isExternalArea:
+              esExterna,
+
+            minutaId:
+              minuta.id,
+
+            creadoPorId:
+              gerencia.id,
+
+            estado,
+
+            completadoAt,
+
+            cerradoAt,
+
+            createdAt:
+              fechaMinuta,
+
+            estadoConceptual:
+              estado ===
+                EstadoTarea.CERRADO
+                ? EstadoConceptual.CERRADO
+                : EstadoConceptual.EN_REVISION,
+
+            estadoOperativo:
+              estado ===
+              EstadoTarea.PENDIENTE
+                ? EstadoOperativo.PENDIENTE
+                : estado ===
+                  EstadoTarea.EN_PROGRESO
+                ? EstadoOperativo.EN_PROGRESO
+                : EstadoOperativo.COMPLETADO,
+          },
+        });
+
+      if (!esExterna) {
+        const asignados =
+          [...responsables]
+            .sort(
+              () =>
+                0.5 -
+                Math.random()
+            )
+            .slice(
+              0,
+              randomInt(1, 3)
+            );
 
         for (const user of asignados) {
-          // CORRECCIÓN: Tipado explícito
-          let estadoAsig: EstadoAsignacion = EstadoAsignacion.PENDIENTE;
-          let completadoAsig: Date | null = null;
+          let estadoAsig:
+            EstadoAsignacion =
+            EstadoAsignacion.PENDIENTE;
 
-          if (estadoTarea === EstadoTarea.COMPLETADO || estadoTarea === EstadoTarea.CERRADO) {
-            estadoAsig = EstadoAsignacion.COMPLETADO;
-            completadoAsig = fechaCompletado;
-          } else if (estadoTarea === EstadoTarea.EN_PROGRESO) {
-            estadoAsig = Math.random() > 0.5 ? EstadoAsignacion.EN_PROGRESO : EstadoAsignacion.PENDIENTE;
+          if (
+            estado ===
+            EstadoTarea.EN_PROGRESO
+          ) {
+            estadoAsig =
+              EstadoAsignacion.EN_PROGRESO;
           }
 
-          await prisma.tareaAsignacion.create({
-            data: {
-              tareaId: tarea.id,
-              usuarioId: user.id,
-              estado: estadoAsig,
-              completadoAt: completadoAsig,
+          if (
+            estado ===
+              EstadoTarea.COMPLETADO ||
+            estado ===
+              EstadoTarea.CERRADO
+          ) {
+            estadoAsig =
+              EstadoAsignacion.COMPLETADO;
+          }
+
+          await prisma.tareaAsignacion.create(
+            {
+              data: {
+                tareaId:
+                  tarea.id,
+
+                usuarioId:
+                  user.id,
+
+                estado:
+                  estadoAsig,
+
+                completadoAt:
+                  completadoAt,
+              },
             }
-          });
+          );
         }
       }
 
-      totalTareasCreadas++;
+      if (
+        Math.random() >
+        0.6
+      ) {
+        await prisma.tareaNota.create(
+          {
+            data: {
+              tareaId:
+                tarea.id,
+
+              creadoPorId:
+                gerencia.id,
+
+              contenido:
+                "Seguimiento agregado durante revisión ejecutiva.",
+            },
+          }
+        );
+      }
+
+      totalTareas++;
+    }
+
+    const totalNotas =
+      randomInt(1, 5);
+
+    for (
+      let n = 0;
+      n < totalNotas;
+      n++
+    ) {
+      await prisma.notaGeneral.create(
+        {
+          data: {
+            minutaId:
+              minuta.id,
+
+            creadoPorId:
+              gerencia.id,
+
+            contenido: `Observación general ${n + 1} de la minuta.`,
+          },
+        }
+      );
     }
   }
 
-  console.log("✅ ¡Proceso terminado con éxito!");
-  console.log(`📊 Se crearon 30 minutas y un total de ${totalTareasCreadas} tareas.`);
+  console.log(
+    "✅ Seed completado"
+  );
+
+  console.log(
+    `📊 Total tareas creadas: ${totalTareas}`
+  );
 }
 
 main()
-  .catch((e) => {
-    console.error("❌ Error al popular la base de datos:", e);
+  .catch((err) => {
+    console.error(
+      "❌ Error:",
+      err
+    );
+
     process.exit(1);
   })
   .finally(async () => {

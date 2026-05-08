@@ -6,8 +6,8 @@ import type { ListBitacoraQuery } from "./zod";
 
 export const getBitacora = async (req: Request, res: Response) => {
   try {
-    // Seguridad: Solo SUPER_ADMIN puede ver la bitácora completa
-    if (req.user?.rol !== Rol.SUPER_ADMIN) {
+    // Seguridad: solo GERENCIA puede ver la bitácora completa.
+    if (req.user?.rol !== Rol.GERENCIA) {
       return res.status(403).json({ error: "Acceso denegado. Solo administradores." });
     }
 

@@ -46,6 +46,8 @@ export const login = async (req: Request, res: Response) => {
       email: usuario.email,
       rol: usuario.rol,
       nombre: usuario.nombre,
+      linea: usuario.linea,
+      area: usuario.area,
     };
 
     const accessToken = generateAccessToken(payload);

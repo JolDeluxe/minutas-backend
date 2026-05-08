@@ -1,116 +1,324 @@
-import { Area, EstadoTarea, EstadoMinuta, Rol, Linea, Clasificacion, Prioridad, Prisma } from "@prisma/client";
+import {
+  Area,
+  Clasificacion,
+  EstadoConceptual,
+  EstadoMinuta,
+  EstadoOperativo,
+  EstadoTarea,
+  Linea,
+  Prioridad,
+  Prisma,
+  Rol,
+  TipoEventoEntrada,
+} from "@prisma/client";
+
 import { prisma } from "../../db";
+
 import type { ListTareasQuery } from "./zod";
 
-export const calcularIsExternalArea = (area: Area | null | undefined): boolean => {
+// ─────────────────────────────────────────────────────────────
+// FLAGS
+// ─────────────────────────────────────────────────────────────
+
+export const calcularIsExternalArea = (
+  area: Area | null | undefined
+): boolean => {
   if (!area) return false;
+
   return area !== Area.DISENO;
 };
 
 export const calcularCapturaCompleta = (params: {
-  clasificacion:     string | null | undefined;
-  fechaVencimiento:  Date   | null | undefined;
+  clasificacion: Clasificacion | null | undefined;
+  fechaVencimiento: Date | null | undefined;
   totalAsignaciones: number;
 }): boolean => {
   return (
-    params.clasificacion    != null &&
+    params.clasificacion != null &&
     params.fechaVencimiento != null &&
     params.totalAsignaciones > 0
   );
 };
 
+// ─────────────────────────────────────────────────────────────
+// HISTORIAL
+// ─────────────────────────────────────────────────────────────
+
 export const registrarCambio = async (
-  tareaId:      number,
-  usuarioId:    number,
-  campo:        string,
-  valorAntes:   string | null,
-  valorDespues: string | null
+  tareaId: number,
+  usuarioId: number,
+  campo: string,
+  valorAntes: string | null,
+  valorDespues: string | null,
+  tipo: TipoEventoEntrada = TipoEventoEntrada.ACTUALIZACION
 ): Promise<void> => {
   await prisma.tareaHistorial.create({
     data: {
       tareaId,
       usuarioId,
+      tipo,
       campo,
-      valorAntes:   valorAntes   ? String(valorAntes)   : null,
-      valorDespues: valorDespues ? String(valorDespues) : null,
+      valorAntes:
+        valorAntes != null
+          ? String(valorAntes)
+          : null,
+      valorDespues:
+        valorDespues != null
+          ? String(valorDespues)
+          : null,
     },
   });
 };
 
-export const evaluarEstadoMinuta = async (minutaId: number): Promise<void> => {
+// ─────────────────────────────────────────────────────────────
+// MINUTAS
+// ─────────────────────────────────────────────────────────────
+
+export const evaluarEstadoMinuta = async (
+  minutaId: number
+): Promise<void> => {
   const tareas = await prisma.tarea.findMany({
-    where:  { minutaId },
-    select: { estado: true },
+    where: {
+      minutaId,
+    },
+
+    select: {
+      estado: true,
+    },
   });
+
   if (tareas.length === 0) return;
-  const todasCerradas = tareas.every((t) => t.estado === EstadoTarea.CERRADO);
+
+  const todasCerradas = tareas.every(
+    (t) => t.estado === EstadoTarea.CERRADO
+  );
+
   await prisma.minuta.update({
-    where: { id: minutaId },
-    data:  { estado: todasCerradas ? EstadoMinuta.CERRADA : EstadoMinuta.ACTIVA },
+    where: {
+      id: minutaId,
+    },
+
+    data: {
+      estado: todasCerradas
+        ? EstadoMinuta.CERRADA
+        : EstadoMinuta.ACTIVA,
+    },
   });
 };
 
-/**
- * Construye dinámicamente la cláusula `where` de Prisma para el listado de tareas.
- * Aplica las reglas de visibilidad por rol directamente, garantizando que ningún
- * controlador necesite lógica de filtrado manual.
- */
+// ─────────────────────────────────────────────────────────────
+// WHERE BUILDER
+// ─────────────────────────────────────────────────────────────
+
 export const buildTareasWhere = (
   query: ListTareasQuery,
-  usuario: { id: number; rol: Rol; linea?: Linea | null }
+  usuario: {
+    id: number;
+    rol: Rol;
+    linea?: Linea | null;
+  }
 ): Prisma.TareaWhereInput => {
   const where: Prisma.TareaWhereInput = {};
 
-  // Búsqueda de texto
+  // ─────────────────────────────────────────────────────────
+  // SEARCH
+  // ─────────────────────────────────────────────────────────
+
   if (query.q) {
-    where.descripcion = { contains: query.q };
+    where.descripcion = {
+      contains: query.q,
+    };
   }
 
-  // Filtros multi-valor con operador IN
-  if (query.estado?.length)        where.estado        = { in: query.estado        as EstadoTarea[]   };
-  if (query.area?.length)          where.area          = { in: query.area          as Area[]           };
-  if (query.linea?.length)         where.linea         = { in: query.linea         as Linea[]          };
-  if (query.clasificacion?.length) where.clasificacion = { in: query.clasificacion as Clasificacion[]  };
-  if (query.prioridad?.length)     where.prioridad     = { in: query.prioridad     as Prioridad[]      };
+  // ─────────────────────────────────────────────────────────
+  // MULTI FILTERS
+  // ─────────────────────────────────────────────────────────
 
-  // Filtros escalares
-  if (query.minutaId    != null) where.minutaId    = query.minutaId;
-  if (query.creadoPorId != null) where.creadoPorId = query.creadoPorId;
-  if (query.isExternalArea  != null) where.isExternalArea  = query.isExternalArea;
-  if (query.capturaCompleta != null) where.capturaCompleta = query.capturaCompleta;
-
-  // Rango: fecha de creación
-  if (query.createdDesde || query.createdHasta) {
-    const f: { gte?: Date; lte?: Date } = {};
-    if (query.createdDesde) f.gte = new Date(query.createdDesde);
-    if (query.createdHasta) f.lte = new Date(query.createdHasta);
-    where.createdAt = f;
+  if (query.estado?.length) {
+    where.estado = {
+      in: query.estado as EstadoTarea[],
+    };
   }
 
-  // Rango: fecha de vencimiento
-  if (query.vencimientoDesde || query.vencimientoHasta) {
-    const f: { gte?: Date; lte?: Date } = {};
-    if (query.vencimientoDesde) f.gte = new Date(query.vencimientoDesde);
-    if (query.vencimientoHasta) f.lte = new Date(query.vencimientoHasta);
-    where.fechaVencimiento = f;
+  if (query.estadoConceptual?.length) {
+    where.estadoConceptual = {
+      in:
+        query.estadoConceptual as EstadoConceptual[],
+    };
   }
 
-  // Rango: fecha de completado (métrica de cumplimiento)
-  if (query.completadoDesde || query.completadoHasta) {
-    const f: { gte?: Date; lte?: Date } = {};
-    if (query.completadoDesde) f.gte = new Date(query.completadoDesde);
-    if (query.completadoHasta) f.lte = new Date(query.completadoHasta);
-    where.completadoAt = f;
+  if (query.estadoOperativo?.length) {
+    where.estadoOperativo = {
+      in:
+        query.estadoOperativo as EstadoOperativo[],
+    };
   }
 
-  // ── Reglas de Visibilidad por Rol ───────────────────────────────────────────
-  // COORDINADOR: visibilidad estricta → solo sus asignaciones explícitas.
-  // JEFE/GERENCIA: si se proporciona responsableId, filtra por ese usuario.
-  //   Si no, sin restricción adicional (ven todo el ecosistema).
+  if (query.area?.length) {
+    where.area = {
+      in: query.area as Area[],
+    };
+  }
+
+  if (query.linea?.length) {
+    where.linea = {
+      in: query.linea as Linea[],
+    };
+  }
+
+  if (query.clasificacion?.length) {
+    where.clasificacion = {
+      in:
+        query.clasificacion as Clasificacion[],
+    };
+  }
+
+  if (query.prioridad?.length) {
+    where.prioridad = {
+      in: query.prioridad as Prioridad[],
+    };
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // SCALAR FILTERS
+  // ─────────────────────────────────────────────────────────
+
+  if (query.minutaId != null) {
+    where.minutaId = query.minutaId;
+  }
+
+  if (query.creadoPorId != null) {
+    where.creadoPorId = query.creadoPorId;
+  }
+
+  if (query.isExternalArea != null) {
+    where.isExternalArea =
+      query.isExternalArea;
+  }
+
+  if (query.capturaCompleta != null) {
+    where.capturaCompleta =
+      query.capturaCompleta;
+  }
+
+  if (query.requiereSeguimiento != null) {
+    where.requiereSeguimiento =
+      query.requiereSeguimiento;
+  }
+
+  if (query.formalizada != null) {
+    where.formalizada = query.formalizada;
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // FECHAS
+  // ─────────────────────────────────────────────────────────
+
+  if (
+    query.createdDesde ||
+    query.createdHasta
+  ) {
+    where.createdAt = {};
+
+    if (query.createdDesde) {
+      where.createdAt.gte = new Date(
+        query.createdDesde
+      );
+    }
+
+    if (query.createdHasta) {
+      where.createdAt.lte = new Date(
+        query.createdHasta
+      );
+    }
+  }
+
+  if (
+    query.vencimientoDesde ||
+    query.vencimientoHasta
+  ) {
+    where.fechaVencimiento = {};
+
+    if (query.vencimientoDesde) {
+      where.fechaVencimiento.gte = new Date(
+        query.vencimientoDesde
+      );
+    }
+
+    if (query.vencimientoHasta) {
+      where.fechaVencimiento.lte = new Date(
+        query.vencimientoHasta
+      );
+    }
+  }
+
+  if (
+    query.completadoDesde ||
+    query.completadoHasta
+  ) {
+    where.completadoAt = {};
+
+    if (query.completadoDesde) {
+      where.completadoAt.gte = new Date(
+        query.completadoDesde
+      );
+    }
+
+    if (query.completadoHasta) {
+      where.completadoAt.lte = new Date(
+        query.completadoHasta
+      );
+    }
+  }
+
+  if (
+    query.seguimientoDesde ||
+    query.seguimientoHasta
+  ) {
+    where.fechaSeguimiento = {};
+
+    if (query.seguimientoDesde) {
+      where.fechaSeguimiento.gte =
+        new Date(query.seguimientoDesde);
+    }
+
+    if (query.seguimientoHasta) {
+      where.fechaSeguimiento.lte =
+        new Date(query.seguimientoHasta);
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // VISIBILIDAD
+  // ─────────────────────────────────────────────────────────
+
+  /**
+   * COORDINADOR
+   * Solo puede ver entradas asignadas explícitamente.
+   */
   if (usuario.rol === Rol.COORDINADOR) {
-    where.asignaciones = { some: { usuarioId: usuario.id } };
-  } else if (query.responsableId != null) {
-    where.asignaciones = { some: { usuarioId: query.responsableId } };
+    where.asignaciones = {
+      some: {
+        usuarioId: usuario.id,
+      },
+    };
+  }
+
+  /**
+   * JEFE / GERENCIA
+   * Pueden ver TODO el ecosistema.
+   * NO existe restricción por línea.
+   */
+
+  if (
+    usuario.rol !== Rol.COORDINADOR &&
+    query.responsableId != null
+  ) {
+    where.asignaciones = {
+      some: {
+        usuarioId: query.responsableId,
+      },
+    };
   }
 
   return where;

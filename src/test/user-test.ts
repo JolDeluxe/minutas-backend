@@ -1,113 +1,194 @@
 // minutas-backend/src/test/user-test.ts
 
-import { env } from "../env"; 
-import { Rol, Area, Linea } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
+import bcrypt from "bcryptjs";
+import {
+  Rol,
+  Area,
+  Linea,
+} from "@prisma/client";
 
-const BASE_URL = `http://localhost:${env.PORT}/api`;
+const prisma = new PrismaClient();
+
+const PASSWORD =
+  "123456";
+
+const HASH_ROUNDS = 10;
 
 const luchadores = [
-  "John Cena",
-  "The Undertaker",
-  "Triple H",
-  "Shawn Michaels",
-  "Steve Austin",
-  "Dwayne Johnson",
-  "Roman Reigns",
-  "Seth Rollins",
-  "Randy Orton",
-  "Brock Lesnar",
+  {
+    nombre: "John Cena",
+    username: "john.cena",
+    email: "john.cena@wwe.test",
+    rol: Rol.GERENCIA,
+    linea: Linea.CALZADO,
+  },
+
+  {
+    nombre: "The Undertaker",
+    username: "the.undertaker",
+    email: "the.undertaker@wwe.test",
+    rol: Rol.JEFE,
+    linea: Linea.BOTA,
+  },
+
+  {
+    nombre: "Triple H",
+    username: "triple.h",
+    email: "triple.h@wwe.test",
+    rol: Rol.JEFE,
+    linea: Linea.ROPA,
+  },
+
+  {
+    nombre: "Shawn Michaels",
+    username: "shawn.michaels",
+    email: "shawn.michaels@wwe.test",
+    rol: Rol.COORDINADOR,
+    linea: Linea.ACCESORIOS,
+  },
+
+  {
+    nombre: "Steve Austin",
+    username: "steve.austin",
+    email: "steve.austin@wwe.test",
+    rol: Rol.COORDINADOR,
+    linea: Linea.CALZADO,
+  },
+
+  {
+    nombre: "Dwayne Johnson",
+    username: "dwayne.johnson",
+    email: "dwayne.johnson@wwe.test",
+    rol: Rol.COORDINADOR,
+    linea: Linea.BOTA,
+  },
+
+  {
+    nombre: "Roman Reigns",
+    username: "roman.reigns",
+    email: "roman.reigns@wwe.test",
+    rol: Rol.COORDINADOR,
+    linea: Linea.ROPA,
+  },
+
+  {
+    nombre: "Seth Rollins",
+    username: "seth.rollins",
+    email: "seth.rollins@wwe.test",
+    rol: Rol.COORDINADOR,
+    linea: Linea.ACCESORIOS,
+  },
+
+  {
+    nombre: "Randy Orton",
+    username: "randy.orton",
+    email: "randy.orton@wwe.test",
+    rol: Rol.JEFE,
+    linea: Linea.CALZADO,
+  },
+
+  {
+    nombre: "Brock Lesnar",
+    username: "brock.lesnar",
+    email: "brock.lesnar@wwe.test",
+    rol: Rol.COORDINADOR,
+    linea: Linea.BOTA,
+  },
 ];
 
-// Arreglo de líneas para irlas rotando entre los usuarios
-const lineasDiseno = [Linea.CALZADO, Linea.BOTA, Linea.ROPA, Linea.ACCESORIOS];
+async function main() {
+  console.log(
+    "🔥 Creando usuarios WWE..."
+  );
 
-async function runTest() {
-  console.log("🚀 Iniciando prueba de inserción de usuarios (WWE Edition)...\n");
+  const hashedPassword =
+    await bcrypt.hash(
+      PASSWORD,
+      HASH_ROUNDS
+    );
 
-  let token = "";
-
-  // 1. Iniciar sesión como Administrador (GERENCIA) para obtener el token
-  try {
-    console.log(`🔑 Intentando login con el admin del sistema: ${env.SYS_ADMIN_USER}...`);
-    const loginRes = await fetch(`${BASE_URL}/auth/login`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        identifier: env.SYS_ADMIN_USER, 
-        password: env.SYS_ADMIN_PASS,
-      }),
-    });
-
-    const loginData = (await loginRes.json()) as any; 
-
-    if (!loginRes.ok) {
-      throw new Error(loginData.message || "Fallo en el login");
-    }
-
-    token = loginData.accessToken; 
-    console.log("✅ Login exitoso. Token obtenido.\n");
-  } catch (error) {
-    console.error("❌ Error de autenticación. ¿Está corriendo el servidor y las credenciales son correctas?", error);
-    process.exit(1);
-  }
-
-  // 2. Insertar a los 10 luchadores
-  let exitosos = 0;
-  let fallidos = 0;
-
-  for (const [index, nombre] of luchadores.entries()) {
-    try {
-      // Alternamos roles: 1 Jefe por cada 2 Coordinadores
-      const rolAsignado = index % 3 === 0 ? Rol.JEFE : Rol.COORDINADOR;
-      
-      // Alternamos la línea que les toca
-      const lineaAsignada = lineasDiseno[index % lineasDiseno.length];
-
-      // Creamos un email ficticio basado en el nombre
-      const email = `${nombre.toLowerCase().replace(/\s+/g, ".")}@wwe.test.com`;
-
-      const reqBody = {
-        nombre: nombre,
-        password: "password123", // Una contraseña estándar para pruebas
-        email: email,
-        rol: rolAsignado,
-        area: Area.DISENO,       // <-- NUEVO: Los asignamos al área de diseño
-        linea: lineaAsignada     // <-- NUEVO: Les damos su línea (Bota, Ropa, etc.)
-        // No enviamos 'username' para probar tu generador automático
-      };
-
-      const res = await fetch(`${BASE_URL}/usuarios`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`, 
+  for (const user of luchadores) {
+    const creado =
+      await prisma.usuario.upsert({
+        where: {
+          username:
+            user.username,
         },
-        body: JSON.stringify(reqBody),
+
+        update: {
+          nombre:
+            user.nombre,
+
+          email:
+            user.email,
+
+          rol:
+            user.rol,
+
+          area:
+            Area.DISENO,
+
+          linea:
+            user.linea,
+
+          password:
+            hashedPassword,
+        },
+
+        create: {
+          nombre:
+            user.nombre,
+
+          username:
+            user.username,
+
+          email:
+            user.email,
+
+          password:
+            hashedPassword,
+
+          rol:
+            user.rol,
+
+          area:
+            Area.DISENO,
+
+          linea:
+            user.linea,
+        },
       });
 
-      const data = (await res.json()) as any;
-
-      if (res.ok) {
-        console.log(`✅ Creado [${data.data.id}]: ${data.data.nombre} (${rolAsignado} - ${lineaAsignada}) -> Username: ${data.data.username}`);
-        exitosos++;
-      } else {
-        console.error(`❌ Error al crear a ${nombre}:`, data.error || data.details || data);
-        fallidos++;
-      }
-    } catch (error) {
-      console.error(`❌ Error de red al intentar crear a ${nombre}:`, error);
-      fallidos++;
-    }
+    console.log(
+      `✅ ${creado.username} | ${creado.rol}`
+    );
   }
 
-  console.log("\n📊 Resumen de la prueba:");
-  console.log(`✔️  Exitosos: ${exitosos}`);
-  console.log(`❌  Fallidos: ${fallidos}`);
-  
-  if (exitosos === luchadores.length) {
-    console.log("🏆 ¡Prueba superada! El módulo de creación de usuarios funciona perfectamente.");
-  }
+  console.log("");
+  console.log(
+    "🏆 Usuarios WWE creados correctamente"
+  );
+
+  console.log("");
+  console.log(
+    "🔑 PASSWORD GLOBAL:"
+  );
+
+  console.log(
+    PASSWORD
+  );
 }
 
-// Ejecutar la prueba
-runTest();
+main()
+  .catch((error) => {
+    console.error(
+      "❌ Error:",
+      error
+    );
+
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });

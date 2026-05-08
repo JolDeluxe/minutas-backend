@@ -36,18 +36,38 @@ enum Linea {
 }
 
 enum Clasificacion {
+  IDEA
+  OBSERVACION
+  ACUERDO
   INVESTIGACION
   CORRECCION
   ANALISIS
   MUESTRA
+  SEGUIMIENTO
+  SOLICITUD
   POLITICAS
+  TAREA
   OTROS
 }
 
 enum Prioridad {
   BAJA
   MEDIA
+  ALTA
   CRITICA
+}
+
+enum EstadoConceptual {
+  CAPTURADO
+  EN_REVISION
+  CERRADO
+  DESCARTADO
+}
+
+enum EstadoOperativo {
+  PENDIENTE
+  EN_PROGRESO
+  COMPLETADO
 }
 
 enum EstadoTarea {
@@ -55,6 +75,11 @@ enum EstadoTarea {
   EN_PROGRESO
   COMPLETADO
   CERRADO
+}
+
+enum TipoAsignacion {
+  SEGUIMIENTO
+  EJECUTOR
 }
 
 enum EstadoAsignacion {
@@ -66,6 +91,19 @@ enum EstadoAsignacion {
 enum EstadoMinuta {
   ACTIVA
   CERRADA
+}
+
+enum TipoEventoEntrada {
+  CAPTURA
+  ACTUALIZACION
+  REVISION
+  FORMALIZACION
+  ASIGNACION
+  CAMBIO_ESTADO
+  CIERRE
+  DESCARTE
+  COMENTARIO
+  ADJUNTO
 }
 
 // ─── MODELOS ─────────────────────────────────────────────
@@ -86,15 +124,20 @@ model Usuario {
 
   mustChangePassword Boolean @default(false)
 
-  minutasCreadas Minuta[]             @relation("MinutaCreador")
-  tareasCreadas  Tarea[]              @relation("TareaCreador")
-  asignaciones   TareaAsignacion[]
-  historial      TareaHistorial[]
-  bitacoras         Bitacora[]
-  refreshTokens     RefreshToken[]
-  resetTokens       PasswordResetToken[]
-  notificaciones    Notificacion[]
-  pushSubscriptions PushSubscription[]
+  minutasCreadas        Minuta[]             @relation("MinutaCreador")
+  minutasCerradas       Minuta[]             @relation("MinutaCerrador")
+  tareasCreadas         Tarea[]              @relation("TareaCreador")
+  tareasFormalizadas    Tarea[]              @relation("TareaFormalizador")
+  asignaciones          TareaAsignacion[]
+  asignacionesCreadas   TareaAsignacion[]    @relation("TareaAsignador")
+  historial             TareaHistorial[]
+  notasGeneralesCreadas NotaGeneral[]        @relation("NotaGeneralCreador")
+  notasEntradaCreadas   TareaNota[]          @relation("TareaNotaCreador")
+  bitacoras             Bitacora[]
+  refreshTokens         RefreshToken[]
+  resetTokens           PasswordResetToken[]
+  notificaciones        Notificacion[]
+  pushSubscriptions     PushSubscription[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -113,6 +156,10 @@ model Minuta {
   creadoPorId Int
   creadoPor   Usuario @relation("MinutaCreador", fields: [creadoPorId], references: [id], onDelete: Restrict)
 
+  cerradoPorId Int?
+  cerradoPor   Usuario?  @relation("MinutaCerrador", fields: [cerradoPorId], references: [id], onDelete: SetNull)
+  cerradoAt    DateTime?
+
   tareas         Tarea[]
   notasGenerales NotaGeneral[] // <--- SE AGREGAN LOS POST-ITS A LA MINUTA
 
@@ -120,6 +167,7 @@ model Minuta {
   updatedAt DateTime @updatedAt
 
   @@index([creadoPorId])
+  @@index([cerradoPorId])
   @@index([estado])
   @@index([fecha])
 }
@@ -134,33 +182,51 @@ model NotaGeneral {
   minutaId Int
   minuta   Minuta @relation(fields: [minutaId], references: [id], onDelete: Cascade)
 
+  creadoPorId Int?
+  creadoPor   Usuario? @relation("NotaGeneralCreador", fields: [creadoPorId], references: [id], onDelete: SetNull)
+
   createdAt DateTime @default(now())
 
   @@index([minutaId])
+  @@index([creadoPorId])
 }
 
+/// Entrada Organizacional.
+/// Se conserva el nombre tecnico `Tarea` por compatibilidad con los modulos actuales,
+/// pero conceptualmente representa ideas, acuerdos, observaciones, seguimientos y
+/// trabajo formalizado dentro de una minuta.
 model Tarea {
   id          Int    @id @default(autoincrement())
   descripcion String @db.Text
 
-  // Captura fase 1 (durante junta — todos opcionales)
-  area      Area       @default(DISENO)
-  prioridad Prioridad?
-  linea     Linea?
+  // Fase 1: captura ligera durante junta.
+  area                Area           @default(DISENO)
+  linea               Linea?
+  clasificacion       Clasificacion?
+  fechaSeguimiento    DateTime?
+  requiereSeguimiento Boolean        @default(false)
 
-  // Captura fase 2 (post-junta)
-  clasificacion    Clasificacion?
+  // Fase 2: organizacion post-junta y formalizacion progresiva.
+  estadoConceptual EstadoConceptual @default(CAPTURADO)
+  formalizada      Boolean          @default(false)
+  formalizadoAt    DateTime?
+  formalizadoPorId Int?
+  formalizadoPor   Usuario?         @relation("TareaFormalizador", fields: [formalizadoPorId], references: [id], onDelete: SetNull)
+
+  // Solo aplica a entradas formalizadas como trabajo operativo real.
+  prioridad        Prioridad?
+  estadoOperativo  EstadoOperativo?
   fechaVencimiento DateTime?
+  completadoAt     DateTime? // Fecha que cuenta para métricas.
 
-  // Estado y fechas de control
-  estado       EstadoTarea @default(PENDIENTE)
-  completadoAt DateTime? // Fecha que cuenta para métricas
-  cerradoAt    DateTime? // Fecha de cierre (no afecta métricas)
+  // Compatibilidad temporal con el backend actual.
+  estado    EstadoTarea @default(PENDIENTE)
+  cerradoAt DateTime? // Fecha de cierre (no afecta métricas)
 
-  // Flags de negocio (calculados por backend al crear/actualizar)
+  // Flags de negocio legacy (calculados por backend al crear/actualizar)
   capturaCompleta Boolean @default(false)
   isExternalArea  Boolean @default(false)
-  pdfUrl          String?  @db.Text
+  pdfUrl          String? @db.Text
 
   minutaId Int?
   minuta   Minuta? @relation(fields: [minutaId], references: [id], onDelete: SetNull)
@@ -179,12 +245,20 @@ model Tarea {
 
   @@index([minutaId])
   @@index([estado])
+  @@index([estadoConceptual])
+  @@index([estadoOperativo])
   @@index([area])
   @@index([isExternalArea])
   @@index([capturaCompleta])
+  @@index([formalizada])
+  @@index([requiereSeguimiento])
+  @@index([fechaSeguimiento])
   @@index([fechaVencimiento])
   @@index([creadoPorId])
+  @@index([formalizadoPorId])
   @@index([minutaId, estado])
+  @@index([formalizada, estadoOperativo])
+  @@index([fechaSeguimiento, estadoConceptual])
   @@index([area, estado])
 }
 
@@ -198,13 +272,18 @@ model TareaNota {
   tareaId Int
   tarea   Tarea @relation(fields: [tareaId], references: [id], onDelete: Cascade)
 
+  creadoPorId Int?
+  creadoPor   Usuario? @relation("TareaNotaCreador", fields: [creadoPorId], references: [id], onDelete: SetNull)
+
   createdAt DateTime @default(now())
 
   @@index([tareaId])
+  @@index([creadoPorId])
 }
 
 model TareaAsignacion {
   id           Int              @id @default(autoincrement())
+  tipo         TipoAsignacion   @default(EJECUTOR)
   estado       EstadoAsignacion @default(PENDIENTE)
   completadoAt DateTime?
 
@@ -214,12 +293,17 @@ model TareaAsignacion {
   usuarioId Int
   usuario   Usuario @relation(fields: [usuarioId], references: [id], onDelete: Restrict)
 
+  asignadoPorId Int?
+  asignadoPor   Usuario? @relation("TareaAsignador", fields: [asignadoPorId], references: [id], onDelete: SetNull)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([tareaId, usuarioId])
+  @@unique([tareaId, usuarioId, tipo])
   @@index([tareaId])
   @@index([usuarioId])
+  @@index([asignadoPorId])
+  @@index([tipo])
   @@index([estado])
 }
 
@@ -238,10 +322,12 @@ model TareaImagen {
 }
 
 model TareaHistorial {
-  id           Int     @id @default(autoincrement())
-  campo        String  @db.VarChar(100)
-  valorAntes   String? @db.Text
-  valorDespues String? @db.Text
+  id           Int               @id @default(autoincrement())
+  tipo         TipoEventoEntrada @default(ACTUALIZACION)
+  campo        String            @db.VarChar(100)
+  valorAntes   String?           @db.Text
+  valorDespues String?           @db.Text
+  metadata     Json?
 
   tareaId Int
   tarea   Tarea @relation(fields: [tareaId], references: [id], onDelete: Cascade)
@@ -253,6 +339,7 @@ model TareaHistorial {
 
   @@index([tareaId])
   @@index([usuarioId])
+  @@index([tipo])
 }
 
 // ─── INFRAESTRUCTURA (Reutilizados del sistema anterior) ──
@@ -299,6 +386,11 @@ model PasswordResetToken {
 // ─── NOTIFICACIONES ──────────────────────────────────────
 
 enum TipoNotificacion {
+  ENTRADA_CAPTURADA
+  ENTRADA_FORMALIZADA
+  ENTRADA_DESCARTADA
+  SEGUIMIENTO_ASIGNADO
+  SEGUIMIENTO_PROXIMO
   NUEVAS_TAREAS
   TAREA_ASIGNADA
   TAREA_COMPLETADA
@@ -321,7 +413,7 @@ model Notificacion {
   usuario   Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
 
   tareaId Int?
-  tarea   Tarea?  @relation(fields: [tareaId], references: [id], onDelete: SetNull)
+  tarea   Tarea? @relation(fields: [tareaId], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now())
 
