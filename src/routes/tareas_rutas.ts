@@ -29,7 +29,8 @@ router.use(authenticate);
 router.get("/", validate(listTareasSchema), listTareas);
 
 // Creación masiva o individual (Soporta FormData para imágenes)
-router.post("/", upload.array("imagenes", 3), validate(createTareaSchema), crearTarea);
+// Se usa upload.any() para soportar fieldnames dinámicos: imagen_tarea_{index}_{i}
+router.post("/", upload.any(), validate(createTareaSchema), crearTarea);
 
 // Obtener detalle por ID
 router.get("/:id", validate(tareaIdSchema), getTareaById);

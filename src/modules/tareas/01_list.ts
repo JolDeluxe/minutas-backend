@@ -7,6 +7,8 @@ import { registrarError } from "../../utils/logger";
 
 import { buildTareasWhere } from "./helpers";
 
+import { USUARIO_SELECT_BASICO } from "../shared-selects";
+
 import type { ListTareasQuery } from "./zod";
 
 export const listTareas = async (
@@ -60,15 +62,7 @@ export const listTareas = async (
             asignaciones: {
               include: {
                 usuario: {
-                  select: {
-                    id: true,
-                    nombre: true,
-                    username: true,
-                    imagen: true,
-                    rol: true,
-                    area: true,
-                    linea: true,
-                  },
+                  select: USUARIO_SELECT_BASICO,
                 },
               },
             },
@@ -83,12 +77,7 @@ export const listTareas = async (
             },
 
             creadoPor: {
-              select: {
-                id: true,
-                nombre: true,
-                username: true,
-                imagen: true,
-              },
+              select: USUARIO_SELECT_BASICO,
             },
 
             formalizadoPor: {

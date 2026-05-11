@@ -77,6 +77,15 @@ export const registrarCambio = async (
 export const evaluarEstadoMinuta = async (
   minutaId: number
 ): Promise<void> => {
+  // Verificar si la minuta fue cerrada manualmente por un usuario.
+  // Si fue cerrada manualmente, NO la reabrimos automáticamente.
+  const minuta = await prisma.minuta.findUnique({
+    where: { id: minutaId },
+    select: { estado: true, cerradoPorId: true },
+  });
+
+  if (!minuta || minuta.cerradoPorId != null) return;
+
   const tareas = await prisma.tarea.findMany({
     where: {
       minutaId,
@@ -292,28 +301,22 @@ export const buildTareasWhere = (
   // VISIBILIDAD
   // ─────────────────────────────────────────────────────────
 
-  /**
-   * COORDINADOR
-   * Solo puede ver entradas asignadas explícitamente.
-   */
   if (usuario.rol === Rol.COORDINADOR) {
+    /**
+     * COORDINADOR
+     * Solo puede ver entradas asignadas explícitamente.
+     */
     where.asignaciones = {
       some: {
         usuarioId: usuario.id,
       },
     };
-  }
-
-  /**
-   * JEFE / GERENCIA
-   * Pueden ver TODO el ecosistema.
-   * NO existe restricción por línea.
-   */
-
-  if (
-    usuario.rol !== Rol.COORDINADOR &&
-    query.responsableId != null
-  ) {
+  } else if (query.responsableId != null) {
+    /**
+     * JEFE / GERENCIA
+     * Pueden ver TODO el ecosistema.
+     * Filtro opcional por responsable específico.
+     */
     where.asignaciones = {
       some: {
         usuarioId: query.responsableId,

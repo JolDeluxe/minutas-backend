@@ -8,8 +8,8 @@ import {
   EstadoTarea,
   EstadoAsignacion,
   EstadoOperativo,
-  EstadoConceptual,
   Rol,
+  TipoAsignacion,
 } from "@prisma/client";
 
 import {
@@ -113,23 +113,25 @@ export const changeEstadoTarea = async (
         },
       });
 
-      const asignacionesActualizadas =
+      // Solo evaluar EJECUTORES para determinar si la tarea global está completa
+      const asignacionesEjecutores =
         await prisma.tareaAsignacion.findMany({
           where: {
             tareaId: id,
+            tipo: TipoAsignacion.EJECUTOR,
           },
         });
 
-      const todosCompletaron =
-        asignacionesActualizadas.length > 0 &&
-        asignacionesActualizadas.every(
+      const todosEjecutoresCompletaron =
+        asignacionesEjecutores.length > 0 &&
+        asignacionesEjecutores.every(
           (a) =>
             a.estado ===
             EstadoAsignacion.COMPLETADO
         );
 
-      const algunEnProgreso =
-        asignacionesActualizadas.some(
+      const algunEjecutorEnProgreso =
+        asignacionesEjecutores.some(
           (a) =>
             a.estado ===
             EstadoAsignacion.EN_PROGRESO
@@ -139,15 +141,15 @@ export const changeEstadoTarea = async (
 
       let nuevoEstadoOperativo:
         | EstadoOperativo
-        | null = EstadoOperativo.PENDIENTE;
+        | null = tarea.estadoOperativo;
 
-      if (todosCompletaron) {
+      if (todosEjecutoresCompletaron) {
         nuevoEstadoGlobal =
           EstadoTarea.COMPLETADO;
 
         nuevoEstadoOperativo =
           EstadoOperativo.COMPLETADO;
-      } else if (algunEnProgreso) {
+      } else if (algunEjecutorEnProgreso) {
         nuevoEstadoGlobal =
           EstadoTarea.EN_PROGRESO;
 
@@ -155,27 +157,23 @@ export const changeEstadoTarea = async (
           EstadoOperativo.EN_PROGRESO;
       }
 
+      const dataUpdate: Record<string, any> = {
+        estado: nuevoEstadoGlobal,
+        estadoOperativo: nuevoEstadoOperativo,
+      };
+
+      // NO forzar estadoConceptual a CERRADO al completar operativamente.
+      // El eje conceptual se gestiona independientemente por jefaturas.
+
+      if (nuevoEstadoGlobal === EstadoTarea.COMPLETADO) {
+        dataUpdate.completadoAt = new Date();
+      } else {
+        dataUpdate.completadoAt = null;
+      }
+
       await prisma.tarea.update({
         where: { id },
-
-        data: {
-          estado: nuevoEstadoGlobal,
-
-          estadoOperativo:
-            nuevoEstadoOperativo,
-
-          estadoConceptual:
-            nuevoEstadoGlobal ===
-            EstadoTarea.COMPLETADO
-              ? EstadoConceptual.CERRADO
-              : tarea.estadoConceptual,
-
-          completadoAt:
-            nuevoEstadoGlobal ===
-            EstadoTarea.COMPLETADO
-              ? new Date()
-              : null,
-        },
+        data: dataUpdate,
       });
 
       if (nuevoEstadoGlobal !== tarea.estado) {
@@ -203,8 +201,8 @@ export const changeEstadoTarea = async (
         dataUpdate.estadoOperativo =
           EstadoOperativo.COMPLETADO;
 
-        dataUpdate.estadoConceptual =
-          EstadoConceptual.CERRADO;
+        // NO forzar estadoConceptual a CERRADO.
+        // El eje conceptual se gestiona independientemente.
 
         dataUpdate.completadoAt =
           new Date();
@@ -252,8 +250,13 @@ export const changeEstadoTarea = async (
             include: {
               usuario: {
                 select: {
+                  id: true,
                   nombre: true,
+                  username: true,
                   imagen: true,
+                  rol: true,
+                  area: true,
+                  linea: true,
                 },
               },
             },

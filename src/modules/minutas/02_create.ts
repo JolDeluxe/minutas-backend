@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 import { prisma } from "../../db";
 import { Linea } from "@prisma/client";
 import { registrarAccion, registrarError } from "../../utils/logger";
+import { USUARIO_SELECT_BASICO } from "../shared-selects";
 import type { CreateMinutaInput } from "./zod";
 
 export const crearMinuta = async (req: Request, res: Response) => {
@@ -16,7 +17,7 @@ export const crearMinuta = async (req: Request, res: Response) => {
         creadoPorId:  usuarioId,
       },
       include: {
-        creadoPor: { select: { id: true, nombre: true, username: true, imagen: true, area: true, linea: true } },
+        creadoPor: { select: USUARIO_SELECT_BASICO },
         _count:    { select: { tareas: true, notasGenerales: true } },
       },
     });

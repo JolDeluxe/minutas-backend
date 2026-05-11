@@ -10,6 +10,7 @@ import {
   Prioridad,
   Clasificacion,
   EstadoOperativo,
+  Rol,
 } from "@prisma/client";
 
 import {
@@ -34,12 +35,35 @@ export const updateTarea = async (
 ) => {
   try {
     const usuarioId = req.user!.id;
+    const rolUsuario = req.user!.rol;
 
     const { id } =
       req.params as unknown as UpdateTareaParams;
 
     const datos =
       req.body as UpdateTareaInput;
+
+    // ── Validación de permisos por rol ────────────────────────
+    // COORDINADOR solo puede editar descripción y campos de captura básica.
+    // Campos de Fase 2 (organización post-junta) requieren JEFE o GERENCIA.
+    const camposFase2: (keyof UpdateTareaInput)[] = [
+      "area", "linea", "clasificacion", "prioridad",
+      "estadoConceptual", "estadoOperativo",
+      "fechaVencimiento", "responsables", "formalizada",
+    ];
+
+    if (rolUsuario === Rol.COORDINADOR) {
+      const intentaCambiarFase2 = camposFase2.some(
+        (c) => datos[c] !== undefined
+      );
+
+      if (intentaCambiarFase2) {
+        return res.status(403).json({
+          error:
+            "No tienes permisos para modificar campos de organización post-junta",
+        });
+      }
+    }
 
     const tareaActual =
       await prisma.tarea.findUnique({
@@ -228,87 +252,105 @@ export const updateTarea = async (
       }
     }
 
+    // ── Asignaciones y update en transacción ─────────────────
     let totalAsignacionesFinal =
       tareaActual.asignaciones.length;
 
-    if (datos.responsables !== undefined) {
-      const idsActuales = new Set(
-        tareaActual.asignaciones.map(
-          (a) => a.usuarioId
-        )
-      );
-
-      const idsNuevos = new Set(
-        datos.responsables
-      );
-
-      const idsAgregar =
-        datos.responsables.filter(
-          (uid) => !idsActuales.has(uid)
+    await prisma.$transaction(async (tx) => {
+      if (datos.responsables !== undefined) {
+        const idsActuales = new Set(
+          tareaActual.asignaciones.map(
+            (a) => a.usuarioId
+          )
         );
 
-      const idsEliminar =
-        tareaActual.asignaciones
-          .filter(
-            (a) => !idsNuevos.has(a.usuarioId)
-          )
-          .map((a) => a.id);
+        const idsNuevos = new Set(
+          datos.responsables
+        );
 
-      if (idsEliminar.length > 0) {
-        await prisma.tareaAsignacion.deleteMany({
-          where: {
-            id: {
-              in: idsEliminar,
+        const idsAgregar =
+          datos.responsables.filter(
+            (uid) => !idsActuales.has(uid)
+          );
+
+        const idsEliminar =
+          tareaActual.asignaciones
+            .filter(
+              (a) => !idsNuevos.has(a.usuarioId)
+            )
+            .map((a) => a.id);
+
+        if (idsEliminar.length > 0) {
+          await tx.tareaAsignacion.deleteMany({
+            where: {
+              id: {
+                in: idsEliminar,
+              },
             },
-          },
-        });
+          });
+        }
+
+        if (idsAgregar.length > 0) {
+          await tx.tareaAsignacion.createMany({
+            data: idsAgregar.map((uid) => ({
+              tareaId: id,
+              usuarioId: uid,
+              asignadoPorId: usuarioId,
+            })),
+
+            skipDuplicates: true,
+          });
+        }
+
+        totalAsignacionesFinal =
+          datos.responsables.length;
       }
 
-      if (idsAgregar.length > 0) {
-        await prisma.tareaAsignacion.createMany({
-          data: idsAgregar.map((uid) => ({
-            tareaId: id,
-            usuarioId: uid,
-          })),
+      // ── Calcular capturaCompleta y formalizada ───────────
+      const clasificacionFinal =
+        data.clasificacion !== undefined
+          ? data.clasificacion
+          : tareaActual.clasificacion;
 
-          skipDuplicates: true,
+      const fechaFinal =
+        data.fechaVencimiento !== undefined
+          ? data.fechaVencimiento
+          : tareaActual.fechaVencimiento;
+
+      const capturaCompleta =
+        calcularCapturaCompleta({
+          clasificacion: clasificacionFinal,
+          fechaVencimiento: fechaFinal,
+          totalAsignaciones: totalAsignacionesFinal,
         });
+
+      data.capturaCompleta = capturaCompleta;
+
+      // Gestionar formalización automática
+      if (capturaCompleta && !tareaActual.formalizada) {
+        data.formalizada = true;
+        data.formalizadoAt = new Date();
+        data.formalizadoPorId = usuarioId;
       }
 
-      totalAsignacionesFinal =
-        datos.responsables.length;
-    }
+      // ── estadoOperativo: solo cambiar cuando hay transición real ──
+      // NO resetear a PENDIENTE si ya está EN_PROGRESO o COMPLETADO.
+      if (totalAsignacionesFinal > 0 && tareaActual.estadoOperativo === null) {
+        // Transición de "sin asignaciones" a "con asignaciones"
+        data.estadoOperativo = EstadoOperativo.PENDIENTE;
+      } else if (totalAsignacionesFinal === 0 && tareaActual.estadoOperativo !== null) {
+        // Se eliminaron todas las asignaciones
+        data.estadoOperativo = null;
+      }
+      // En cualquier otro caso: NO tocar estadoOperativo.
 
-    const clasificacionFinal =
-      data.clasificacion !== undefined
-        ? data.clasificacion
-        : tareaActual.clasificacion;
-
-    const fechaFinal =
-      data.fechaVencimiento !== undefined
-        ? data.fechaVencimiento
-        : tareaActual.fechaVencimiento;
-
-    const capturaCompleta =
-      calcularCapturaCompleta({
-        clasificacion: clasificacionFinal,
-        fechaVencimiento: fechaFinal,
-        totalAsignaciones: totalAsignacionesFinal,
-      });
-
-    data.capturaCompleta = capturaCompleta;
-
-    data.estadoOperativo =
-      totalAsignacionesFinal > 0
-        ? EstadoOperativo.PENDIENTE
-        : null;
-
-    if (Object.keys(data).length > 0) {
-      await prisma.tarea.update({
-        where: { id },
-        data,
-      });
-    }
+      if (Object.keys(data).length > 0) {
+        await tx.tarea.update({
+          where: { id },
+          data,
+        });
+      }
+    });
 
     if (historial.length > 0) {
       await Promise.all(
@@ -349,6 +391,9 @@ export const updateTarea = async (
                   nombre: true,
                   username: true,
                   imagen: true,
+                  rol: true,
+                  area: true,
+                  linea: true,
                 },
               },
             },
@@ -359,6 +404,9 @@ export const updateTarea = async (
               id: true,
               nombre: true,
               username: true,
+              imagen: true,
+              area: true,
+              linea: true,
             },
           },
 

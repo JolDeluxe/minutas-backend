@@ -9,8 +9,10 @@ import {
   Prioridad,
   Clasificacion,
   EstadoConceptual,
+  EstadoMinuta,
   EstadoOperativo,
   EstadoTarea,
+  TipoAsignacion,
 } from "@prisma/client";
 
 import {
@@ -39,21 +41,34 @@ export const crearTarea = async (
     const tareasPayload =
       req.body.tareas as CreateTareaInput[];
 
-    const minutaId = tareasPayload[0]?.minutaId;
+    // ── Validar TODAS las minutas referenciadas ──────────────
+    const uniqueMinutaIds = [
+      ...new Set(
+        tareasPayload
+          .map((t) => t.minutaId)
+          .filter((id): id is number => id != null)
+      ),
+    ];
 
-    if (minutaId) {
+    for (const mId of uniqueMinutaIds) {
       const minuta = await prisma.minuta.findUnique({
-        where: {
-          id: minutaId,
-        },
+        where: { id: mId },
       });
 
       if (!minuta) {
         return res.status(404).json({
-          error: "Minuta no encontrada",
+          error: `Minuta ${mId} no encontrada`,
+        });
+      }
+
+      if (minuta.estado === EstadoMinuta.CERRADA) {
+        return res.status(400).json({
+          error: `La minuta "${minuta.titulo}" está cerrada y no acepta nuevas entradas`,
         });
       }
     }
+
+    const minutaId = uniqueMinutaIds[0] ?? null;
 
     const files =
       req.files as Express.Multer.File[] | undefined;
@@ -85,32 +100,19 @@ export const crearTarea = async (
           f.fieldname.startsWith(`imagen_tarea_${index}_`)
         ) || [];
 
-      const imagenesData: {
-        url: string;
-        publicId: string;
-        orden: number;
-      }[] = [];
-
-      if (archivosDeEstaTarea.length > 0) {
-        for (
-          let i = 0;
-          i < Math.min(archivosDeEstaTarea.length, 3);
-          i++
-        ) {
-          const file = archivosDeEstaTarea[i];
-
-          if (!file) continue;
-
+      // ── Upload paralelo de imágenes ───────────────────────
+      const imagenesData = await Promise.all(
+        archivosDeEstaTarea.slice(0, 3).map(async (file, i) => {
           const { url, publicId } =
             await uploadTaskImage(file.buffer);
 
-          imagenesData.push({
+          return {
             url,
             publicId,
             orden: i + 1,
-          });
-        }
-      }
+          };
+        })
+      );
 
       const tareaId = await prisma.$transaction(async (tx) => {
         const totalAsignaciones =
@@ -171,6 +173,11 @@ export const crearTarea = async (
 
             capturaCompleta,
 
+            // Formalizada se setea automáticamente cuando la captura está completa
+            formalizada: capturaCompleta,
+            formalizadoAt: capturaCompleta ? new Date() : null,
+            formalizadoPorId: capturaCompleta ? usuarioId : null,
+
             isExternalArea,
 
             imagenes: {
@@ -199,6 +206,8 @@ export const crearTarea = async (
               (uid) => ({
                 tareaId: nueva.id,
                 usuarioId: uid,
+                tipo: TipoAsignacion.EJECUTOR,
+                asignadoPorId: usuarioId,
               })
             ),
 
@@ -231,6 +240,8 @@ export const crearTarea = async (
                     username: true,
                     imagen: true,
                     rol: true,
+                    area: true,
+                    linea: true,
                   },
                 },
               },
@@ -241,6 +252,9 @@ export const crearTarea = async (
                 id: true,
                 nombre: true,
                 username: true,
+                imagen: true,
+                area: true,
+                linea: true,
               },
             },
 

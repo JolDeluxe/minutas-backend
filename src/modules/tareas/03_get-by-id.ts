@@ -3,6 +3,7 @@
 import type { Request, Response } from "express";
 import { prisma } from "../../db";
 import { registrarError } from "../../utils/logger";
+import { USUARIO_SELECT_BASICO, USUARIO_SELECT_MINIMO } from "../shared-selects";
 import type { TareaIdParams } from "./zod";
 
 export const getTareaById = async (
@@ -28,34 +29,17 @@ export const getTareaById = async (
         asignaciones: {
           include: {
             usuario: {
-              select: {
-                id: true,
-                nombre: true,
-                username: true,
-                imagen: true,
-                rol: true,
-                area: true,
-                linea: true,
-              },
+              select: USUARIO_SELECT_BASICO,
             },
           },
         },
 
         creadoPor: {
-          select: {
-            id: true,
-            nombre: true,
-            username: true,
-            imagen: true,
-          },
+          select: USUARIO_SELECT_BASICO,
         },
 
         formalizadoPor: {
-          select: {
-            id: true,
-            nombre: true,
-            username: true,
-          },
+          select: USUARIO_SELECT_MINIMO,
         },
 
         minuta: {
@@ -82,11 +66,7 @@ export const getTareaById = async (
 
           include: {
             usuario: {
-              select: {
-                id: true,
-                nombre: true,
-                username: true,
-              },
+              select: USUARIO_SELECT_MINIMO,
             },
           },
         },

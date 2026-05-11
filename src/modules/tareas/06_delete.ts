@@ -42,15 +42,22 @@ export const deleteTarea = async (
       });
     }
 
-    for (const img of tarea.imagenes) {
-      deleteImageByPublicId(img.publicId).catch(
-        (err) => {
+    // Eliminar imágenes de Cloudinary en paralelo con tolerancia a fallos
+    if (tarea.imagenes.length > 0) {
+      const results = await Promise.allSettled(
+        tarea.imagenes.map((img) =>
+          deleteImageByPublicId(img.publicId)
+        )
+      );
+
+      for (const result of results) {
+        if (result.status === "rejected") {
           console.error(
-            `Error eliminando imagen ${img.publicId}:`,
-            err
+            "Error eliminando imagen de Cloudinary:",
+            result.reason
           );
         }
-      );
+      }
     }
 
     await prisma.tarea.delete({

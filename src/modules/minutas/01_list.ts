@@ -3,6 +3,7 @@ import { prisma } from "../../db";
 import { Prisma } from "@prisma/client";
 import { registrarError } from "../../utils/logger";
 import { buildMinutasWhere } from "./helpers";
+import { USUARIO_SELECT_BASICO } from "../shared-selects";
 import type { ListMinutasQuery } from "./zod";
 
 export const listarMinutas = async (req: Request, res: Response) => {
@@ -22,7 +23,7 @@ export const listarMinutas = async (req: Request, res: Response) => {
         orderBy: sort as Prisma.MinutaOrderByWithRelationInput[],
         include: {
           creadoPor: {
-            select: { id: true, nombre: true, username: true, imagen: true, area: true, linea: true },
+            select: USUARIO_SELECT_BASICO,
           },
           _count: { select: { tareas: true, notasGenerales: true } },
         },
