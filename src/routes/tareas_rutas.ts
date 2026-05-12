@@ -10,6 +10,8 @@ import {
   imagenIdSchema,
   listTareasSchema,
   deleteTareaSchema,
+  createNotaGeneralSchema,
+  createTareaNotaSchema,
 } from "../modules/tareas/zod";
 import { listTareas }        from "../modules/tareas/01_list";
 import { crearTarea }        from "../modules/tareas/02_create";
@@ -19,6 +21,7 @@ import { changeEstadoTarea } from "../modules/tareas/05_change-status";
 import { deleteTarea }       from "../modules/tareas/06_delete";
 import { addImagenTarea, deleteImagenTarea } from "../modules/tareas/07_imagenes";
 import { generarPdfTarea }   from "../modules/tareas/08_generate-pdf";
+import { createNotaGeneral, createTareaNota } from "../modules/tareas/10_notas";
 
 const router = Router();
 
@@ -53,5 +56,9 @@ router.delete("/:id", validate(deleteTareaSchema), deleteTarea);
 // Gestión modular de imágenes post-creación
 router.post("/:id/imagenes", upload.single("imagen"), validate(tareaIdSchema), addImagenTarea);
 router.delete("/:id/imagenes/:imagenId", validate(imagenIdSchema), deleteImagenTarea);
+
+// ── NOTAS ──
+router.post("/notas/general", validate(createNotaGeneralSchema), createNotaGeneral);
+router.post("/notas/tarea", validate(createTareaNotaSchema), createTareaNota);
 
 export default router;
