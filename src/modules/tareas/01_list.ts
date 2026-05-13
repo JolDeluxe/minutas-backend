@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import { Prisma } from "@prisma/client";
+import { Prisma, EstadoTarea } from "@prisma/client";
 
 import { prisma } from "../../db";
 
@@ -30,19 +30,26 @@ export const listTareas = async (
     const skip =
       (page - 1) * limit;
 
+    // 1. Construir el filtro base que respeta TODO (incluyendo el estado seleccionado)
     const where =
       buildTareasWhere(query, usuario);
+
+    // 2. Construir el filtro para el resumen (ignora el estado seleccionado para que los contadores no cambien)
+    const whereParaResumen: Prisma.TareaWhereInput = { ...where };
+    delete whereParaResumen.estadoOperativo;
 
     const orderBy =
       (sort ??
         [{ createdAt: "desc" }]) as Prisma.TareaOrderByWithRelationInput[];
 
-    const [total, tareas] =
+    const [total, tareas, counts, totalAtrasadas, totalParaResumen] =
       await prisma.$transaction([
+        // Total real filtrado (para paginación)
         prisma.tarea.count({
           where,
         }),
 
+        // Lista de tareas
         prisma.tarea.findMany({
           where,
 
@@ -103,13 +110,68 @@ export const listTareas = async (
             },
           },
         }),
+
+        // Conteos por estado operativo (basado en whereParaResumen)
+        prisma.tarea.groupBy({
+          by: ["estadoOperativo"],
+          where: {
+            ...whereParaResumen,
+            estadoOperativo: { not: null }
+          },
+          _count: {
+            _all: true
+          },
+          orderBy: {
+            estadoOperativo: 'asc'
+          }
+        }),
+
+        // Total de atrasadas (basado en whereParaResumen o where? usualmente global)
+        prisma.tarea.count({
+          where: {
+            ...whereParaResumen,
+            fechaVencimiento: { lt: new Date() },
+            estado: { notIn: [EstadoTarea.COMPLETADO, EstadoTarea.CERRADO] }
+          }
+        }),
+
+        // Total "Real" para el primer botón del SummaryBar
+        prisma.tarea.count({
+          where: whereParaResumen
+        })
       ]);
+
+    // Mapear counts a objeto { PENDIENTE: 5, ... }
+    const countsObj = counts.reduce((acc, curr: any) => {
+      if (curr.estadoOperativo) {
+        acc[curr.estadoOperativo] = curr._count?._all || 0;
+      }
+      return acc;
+    }, {} as Record<string, number>);
+
+    // Enriquecer tareas con isOverdue y responsables aplanados
+    const now = new Date();
+    const tareasConMeta = tareas.map((t: any) => ({
+      ...t,
+      isOverdue:
+        t.fechaVencimiento &&
+        new Date(t.fechaVencimiento) < now &&
+        !['COMPLETADO', 'CERRADO'].includes(t.estado),
+      responsables: t.asignaciones?.map((a: any) => ({
+        id: a.usuario?.id,
+        nombre: a.usuario?.nombre,
+        imagen: a.usuario?.imagen,
+        rol: a.usuario?.rol,
+      })) ?? [],
+    }));
 
     return res.json({
       status: "success",
 
       data: {
         total,
+
+        totalFiltrado: totalParaResumen,
 
         page,
 
@@ -118,7 +180,11 @@ export const listTareas = async (
         totalPages:
           Math.ceil(total / limit),
 
-        tareas,
+        counts: countsObj,
+
+        totalAtrasadas,
+
+        tareas: tareasConMeta,
       },
     });
   } catch (error) {

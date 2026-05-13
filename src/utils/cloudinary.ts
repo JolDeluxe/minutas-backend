@@ -28,7 +28,9 @@ export const uploadUserProfileImage = async (buffer: Buffer): Promise<string> =>
 export const uploadTaskImage = async (
   buffer: Buffer
 ): Promise<{ url: string; publicId: string }> => {
-  const dataUri = `data:image/jpeg;base64,${buffer.toString("base64")}`;
+  // Detectar formato básico (fallback a jpeg)
+  const b64 = buffer.toString("base64");
+  const dataUri = `data:image/jpeg;base64,${b64}`; // Cloudinary suele detectar el formato real del buffer automáticamente
 
   const result = await cloudinary.uploader.upload(dataUri, {
     folder: "minutas-diseño/imagenes", // <-- Carpeta segmentada

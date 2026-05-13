@@ -189,7 +189,10 @@ export const resolverRangoFechas = (
 };
 
 export const buildDashboardWhere = (query: DashboardFiltrosQuery): Prisma.TareaWhereInput => {
-  const where: Prisma.TareaWhereInput = { area: Area.DISENO };
+  const where: Prisma.TareaWhereInput = { 
+    area: Area.DISENO,
+    formalizada: true 
+  };
 
   if (query.q) where.descripcion = { contains: query.q };
   if (query.minutaId != null) where.minutaId = query.minutaId;

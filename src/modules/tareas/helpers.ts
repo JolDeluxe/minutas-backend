@@ -215,8 +215,51 @@ export const buildTareasWhere = (
       query.requiereSeguimiento;
   }
 
-  if (query.formalizada != null) {
+  if (query.formalizada !== undefined) {
     where.formalizada = query.formalizada;
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // PERIODO (NUEVO)
+  // ─────────────────────────────────────────────────────────
+  
+  if (query.periodo && query.periodo !== "all") {
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+
+    const end = new Date();
+    end.setHours(23, 59, 59, 999);
+
+    if (query.periodo === "today") {
+      // Ya está configurado para hoy
+    } else if (query.periodo === "week") {
+      // Ajustar al domingo de esta semana (fin de semana)
+      const day = end.getDay();
+      const diff = 6 - day;
+      end.setDate(end.getDate() + diff);
+    } else if (query.periodo === "month") {
+      // Ajustar al último día del mes
+      end.setMonth(end.getMonth() + 1);
+      end.setDate(0);
+    }
+
+    where.fechaVencimiento = {
+      gte: start,
+      lte: end,
+    };
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // ATRASADAS (NUEVO)
+  // ─────────────────────────────────────────────────────────
+
+  if (query.atrasadas) {
+    where.fechaVencimiento = {
+      lt: new Date(),
+    };
+    where.estado = {
+      notIn: [EstadoTarea.COMPLETADO, EstadoTarea.CERRADO],
+    };
   }
 
   // ─────────────────────────────────────────────────────────
@@ -325,4 +368,33 @@ export const buildTareasWhere = (
   }
 
   return where;
+};
+
+/**
+ * Normaliza una fecha de vencimiento al último segundo del día (23:59:59 UTC).
+ * Acepta strings "YYYY-MM-DD" o ISO completos.
+ * Siempre usa UTC para evitar desfases por zona horaria del servidor.
+ */
+export const normalizarFechaVencimiento = (fecha: Date | string | null | undefined): Date | null => {
+  if (!fecha) return null;
+
+  // Si es un string "YYYY-MM-DD", extraemos directamente el día calendario
+  if (typeof fecha === 'string') {
+    const match = fecha.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (match) {
+      const year = parseInt(match[1]);
+      const month = parseInt(match[2]) - 1;
+      const day = parseInt(match[3]);
+      return new Date(Date.UTC(year, month, day, 23, 59, 59, 999));
+    }
+  }
+
+  // Para Date objects, extraemos componentes UTC
+  const d = new Date(fecha);
+  if (isNaN(d.getTime())) return null;
+
+  return new Date(Date.UTC(
+    d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(),
+    23, 59, 59, 999
+  ));
 };

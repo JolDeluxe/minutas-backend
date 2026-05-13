@@ -22,6 +22,7 @@ import {
   calcularIsExternalArea,
   calcularCapturaCompleta,
   registrarCambio,
+  normalizarFechaVencimiento,
 } from "./helpers";
 
 import type {
@@ -229,10 +230,7 @@ export const updateTarea = async (
     }
 
     if (datos.fechaVencimiento !== undefined) {
-      const nuevaFecha =
-        datos.fechaVencimiento
-          ? new Date(datos.fechaVencimiento)
-          : null;
+      const nuevaFecha = normalizarFechaVencimiento(datos.fechaVencimiento);
 
       const antes =
         tareaActual.fechaVencimiento?.toISOString() ??

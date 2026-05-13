@@ -25,6 +25,7 @@ import { uploadTaskImage } from "../../utils/cloudinary";
 import {
   calcularIsExternalArea,
   calcularCapturaCompleta,
+  normalizarFechaVencimiento,
 } from "./helpers";
 
 import { getIO } from "../../utils/socket";
@@ -38,8 +39,7 @@ export const crearTarea = async (
   try {
     const usuarioId = req.user!.id;
 
-    const tareasPayload =
-      req.body.tareas as CreateTareaInput[];
+    const tareasPayload = req.body.tareas as CreateTareaInput[];
 
     // ── Validar TODAS las minutas referenciadas ──────────────
     const uniqueMinutaIds = [
@@ -85,81 +85,90 @@ export const crearTarea = async (
           tareaInput.area as Area | undefined
         );
 
-      const fechaVenc =
-        tareaInput.fechaVencimiento
-          ? new Date(tareaInput.fechaVencimiento)
-          : null;
+      const fechaVenc = normalizarFechaVencimiento(tareaInput.fechaVencimiento);
 
       const fechaSeguimiento =
         tareaInput.fechaSeguimiento
           ? new Date(tareaInput.fechaSeguimiento)
           : null;
 
-      const archivosDeEstaTarea =
-        files?.filter((f) =>
-          f.fieldname.startsWith(`imagen_tarea_${index}_`)
-        ) || [];
+      // Búsqueda Inteligente de Archivos
+      let archivosDeEstaTarea = files
+        ? files.filter((f) => f.fieldname.includes(`_tarea_${index}_`) || f.fieldname.includes(`_${index}_`))
+        : [];
+
+      // Fallback: Si no encontramos por índice pero hay archivos "huérfanos" (no asignados a tareas previas), 
+      // y estamos ante la única tarea o la primera, tomamos lo que haya.
+      if (archivosDeEstaTarea.length === 0 && files && files.length > 0) {
+          // Si solo hay una tarea, le damos todo lo que llegó (hasta 3)
+          if (tareasPayload.length === 1) {
+              archivosDeEstaTarea = files.slice(0, 3);
+          } else {
+              // Si hay varias, intentamos una distribución secuencial simple si el mapeo por nombre falló
+              // Esto es un último recurso de seguridad
+              const skip = index * 3;
+              archivosDeEstaTarea = files.slice(skip, skip + 3);
+          }
+      }
 
       // ── Upload paralelo de imágenes ───────────────────────
       const imagenesData = await Promise.all(
-        archivosDeEstaTarea.slice(0, 3).map(async (file, i) => {
-          const { url, publicId } =
-            await uploadTaskImage(file.buffer);
-
-          return {
-            url,
-            publicId,
-            orden: i + 1,
-          };
+        (archivosDeEstaTarea || []).slice(0, 3).map(async (file, i) => {
+          try {
+            const { url, publicId } = await uploadTaskImage(file.buffer);
+            return { url, publicId, orden: i + 1 };
+          } catch (err) {
+            console.error(`[Cloudinary Error] Tarea ${index} Imagen ${i}:`, err);
+            return null;
+          }
         })
       );
+
+      // Limpiar fallidos
+      const imagenesValidas = imagenesData.filter((img): img is { url: string; publicId: string; orden: number } => img !== null);
 
       const tareaId = await prisma.$transaction(async (tx) => {
         const totalAsignaciones =
           tareaInput.responsables?.length ?? 0;
 
-        const capturaCompleta =
-          calcularCapturaCompleta({
-            clasificacion:
-              (tareaInput.clasificacion as Clasificacion | undefined) ??
-              null,
+        // --- LÓGICA DE EXCLUSIVIDAD ---
+        // Una entrada es Tarea (Formalizada) O Seguimiento, pero no ambos.
+        let finalFechaVenc = fechaVenc;
+        let finalPrioridad = (tareaInput.prioridad as Prioridad | undefined) ?? null;
+        let finalRequiereSeguimiento = tareaInput.requiereSeguimiento ?? false;
+        let finalFechaSeguimiento = fechaSeguimiento;
 
-            fechaVencimiento: fechaVenc,
+        if (finalRequiereSeguimiento) {
+          // Si es seguimiento, no puede ser tarea operativa (quita vencimiento y prioridad)
+          finalFechaVenc = null;
+          finalPrioridad = null;
+        }
 
-            totalAsignaciones,
-          });
+        const capturaCompleta = calcularCapturaCompleta({
+          clasificacion: (tareaInput.clasificacion as Clasificacion | undefined) ?? null,
+          fechaVencimiento: finalFechaVenc,
+          totalAsignaciones,
+        });
+
+        if (capturaCompleta) {
+          // Si se formaliza como tarea, se apaga el modo seguimiento informativo
+          finalRequiereSeguimiento = false;
+          finalFechaSeguimiento = null;
+        }
+        // ------------------------------
 
         const nueva = await tx.tarea.create({
           data: {
             descripcion: tareaInput.descripcion,
-
             creadoPorId: usuarioId,
-
-            minutaId:
-              tareaInput.minutaId ?? null,
-
-            area:
-              (tareaInput.area as Area | undefined) ??
-              Area.DISENO,
-
-            prioridad:
-              (tareaInput.prioridad as Prioridad | undefined) ??
-              null,
-
-            linea:
-              (tareaInput.linea as Linea | undefined) ??
-              null,
-
-            clasificacion:
-              (tareaInput.clasificacion as Clasificacion | undefined) ??
-              null,
-
-            fechaVencimiento: fechaVenc,
-
-            fechaSeguimiento,
-
-            requiereSeguimiento:
-              tareaInput.requiereSeguimiento ?? false,
+            minutaId: tareaInput.minutaId ?? null,
+            area: (tareaInput.area as Area | undefined) ?? Area.DISENO,
+            prioridad: finalPrioridad,
+            linea: (tareaInput.linea as Linea | undefined) ?? null,
+            clasificacion: (tareaInput.clasificacion as Clasificacion | undefined) ?? null,
+            fechaVencimiento: finalFechaVenc,
+            fechaSeguimiento: finalFechaSeguimiento,
+            requiereSeguimiento: finalRequiereSeguimiento,
 
             estadoConceptual:
               EstadoConceptual.CAPTURADO,
@@ -181,7 +190,7 @@ export const crearTarea = async (
             isExternalArea,
 
             imagenes: {
-              create: imagenesData,
+              create: imagenesValidas,
             },
 
             notas:

@@ -474,6 +474,17 @@ export const listTareasSchema = z.object({
       z.boolean().optional()
     ),
 
+    periodo: z.enum(["all", "today", "week", "month"]).optional(),
+
+    atrasadas: z.preprocess(
+      (v) => {
+        if (v === "true") return true;
+        if (v === "false") return false;
+        return undefined;
+      },
+      z.boolean().optional()
+    ),
+
     createdDesde: isoFecha,
     createdHasta: isoFecha,
 
