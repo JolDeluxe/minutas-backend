@@ -13,6 +13,7 @@ import {
 } from "@prisma/client";
 
 import { prisma } from "../../db";
+import { isValid, parseISO } from "date-fns";
 
 import type { ListTareasQuery } from "./zod";
 
@@ -378,23 +379,16 @@ export const buildTareasWhere = (
 export const normalizarFechaVencimiento = (fecha: Date | string | null | undefined): Date | null => {
   if (!fecha) return null;
 
-  // Si es un string "YYYY-MM-DD", extraemos directamente el día calendario
-  if (typeof fecha === 'string') {
-    const match = fecha.match(/^(\d{4})-(\d{2})-(\d{2})/);
-    if (match) {
-      const year = parseInt(match[1]);
-      const month = parseInt(match[2]) - 1;
-      const day = parseInt(match[3]);
-      return new Date(Date.UTC(year, month, day, 23, 59, 59, 999));
-    }
-  }
+  // Convertimos a objeto Date de forma segura
+  const d = typeof fecha === 'string' ? parseISO(fecha) : new Date(fecha);
+  
+  if (!isValid(d)) return null;
 
-  // Para Date objects, extraemos componentes UTC
-  const d = new Date(fecha);
-  if (isNaN(d.getTime())) return null;
-
+  // Normalizamos al final del día (23:59:59) en UTC para evitar desfases
   return new Date(Date.UTC(
-    d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(),
+    d.getUTCFullYear(),
+    d.getUTCMonth(),
+    d.getUTCDate(),
     23, 59, 59, 999
   ));
 };

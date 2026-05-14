@@ -24,26 +24,37 @@ export const uploadUserProfileImage = async (buffer: Buffer): Promise<string> =>
   return result.secure_url;
 };
 
-// --- FUNCIONES NUEVAS: Para Tareas y Minutas ---
+// ── FIX: Usa upload_stream (igual que uploadPdfDocument) ──────────────────────
+// El método upload() con data URI falla en Bun con imágenes no-JPEG.
+// upload_stream es más robusto y detecta el formato real del buffer.
 export const uploadTaskImage = async (
-  buffer: Buffer
+  buffer: Buffer,
+  mimetype: string = "image/jpeg"
 ): Promise<{ url: string; publicId: string }> => {
-  // Detectar formato básico (fallback a jpeg)
-  const b64 = buffer.toString("base64");
-  const dataUri = `data:image/jpeg;base64,${b64}`; // Cloudinary suele detectar el formato real del buffer automáticamente
-
-  const result = await cloudinary.uploader.upload(dataUri, {
-    folder: "minutas-diseño/imagenes", // <-- Carpeta segmentada
-    resource_type: "image",
-    transformation: [
-      { width: 1280, crop: "limit" },
-      { quality: "auto:good" },
-      { fetch_format: "auto" },
-    ],
+  return new Promise((resolve, reject) => {
+    const uploadStream = cloudinary.uploader.upload_stream(
+      {
+        folder: "minutas-diseño/imagenes",
+        resource_type: "image",
+        transformation: [
+          { width: 1280, crop: "limit" },
+          { quality: "auto:good" },
+          { fetch_format: "auto" },
+        ],
+      },
+      (error, result) => {
+        if (error || !result) {
+          return reject(
+            error ?? new Error("Cloudinary upload_stream: sin resultado")
+          );
+        }
+        resolve({ url: result.secure_url, publicId: result.public_id });
+      }
+    );
+    uploadStream.end(buffer);
   });
-
-  return { url: result.secure_url, publicId: result.public_id };
 };
+
 
 export const uploadPdfDocument = async (buffer: Buffer, filename: string): Promise<string> => {
   return new Promise((resolve, reject) => {

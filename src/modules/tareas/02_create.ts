@@ -73,6 +73,12 @@ export const crearTarea = async (
     const files =
       req.files as Express.Multer.File[] | undefined;
 
+    // FIX: Log de diagnóstico — te permite ver si los archivos llegan al backend
+    console.log(
+      `[crearTarea] archivos recibidos: ${files?.length ?? 0}`,
+      files?.map((f) => `${f.fieldname}(${f.mimetype}, ${f.size}b)`) ?? []
+    );
+
     const tareasCompletasResp: any[] = [];
 
     for (let index = 0; index < tareasPayload.length; index++) {
@@ -115,10 +121,21 @@ export const crearTarea = async (
       const imagenesData = await Promise.all(
         (archivosDeEstaTarea || []).slice(0, 3).map(async (file, i) => {
           try {
-            const { url, publicId } = await uploadTaskImage(file.buffer);
+            // FIX: pasa el mimetype real (image/png, image/webp, etc.)
+            const { url, publicId } = await uploadTaskImage(
+              file.buffer,
+              file.mimetype
+            );
+            console.log(
+              `[crearTarea] imagen subida OK: ${file.fieldname} → ${url}`
+            );
             return { url, publicId, orden: i + 1 };
           } catch (err) {
-            console.error(`[Cloudinary Error] Tarea ${index} Imagen ${i}:`, err);
+            // El error es visible ahora; antes fallaba silenciosamente
+            console.error(
+              `[Cloudinary Error] Tarea ${index} Imagen ${i} (${file.mimetype}):`,
+              err
+            );
             return null;
           }
         })
