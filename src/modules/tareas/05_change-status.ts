@@ -144,6 +144,7 @@ export const changeEstadoTarea = async (
         | null = tarea.estadoOperativo;
 
       if (todosEjecutoresCompletaron) {
+        // COORDINADORES: Nunca auto-aprobamos a CERRADO. Siempre a COMPLETADO (Esperando revisión).
         nuevoEstadoGlobal =
           EstadoTarea.COMPLETADO;
 
@@ -161,9 +162,6 @@ export const changeEstadoTarea = async (
         estado: nuevoEstadoGlobal,
         estadoOperativo: nuevoEstadoOperativo,
       };
-
-      // NO forzar estadoConceptual a CERRADO al completar operativamente.
-      // El eje conceptual se gestiona independientemente por jefaturas.
 
       if (nuevoEstadoGlobal === EstadoTarea.COMPLETADO) {
         dataUpdate.completadoAt = new Date();
@@ -201,7 +199,7 @@ export const changeEstadoTarea = async (
 
       if (estado === EstadoTarea.COMPLETADO) {
         if (esAsignado) {
-          // AUTO-APROBACIÓN: Se registra fin para métricas pero se archiva de una vez
+          // AUTO-APROBACIÓN para JEFES: Se archiva de una vez.
           dataUpdate.estado = EstadoTarea.CERRADO;
           dataUpdate.estadoOperativo = null;
           dataUpdate.completadoAt = new Date();
@@ -214,7 +212,7 @@ export const changeEstadoTarea = async (
 
       if (estado === EstadoTarea.CERRADO) {
         dataUpdate.cerradoAt = new Date();
-        dataUpdate.estadoOperativo = null; // KILL SWITCH
+        dataUpdate.estadoOperativo = null;
       }
 
       await prisma.tarea.update({

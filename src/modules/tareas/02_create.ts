@@ -136,6 +136,7 @@ export const crearTarea = async (
               `[Cloudinary Error] Tarea ${index} Imagen ${i} (${file.mimetype}):`,
               err
             );
+            
             return null;
           }
         })
