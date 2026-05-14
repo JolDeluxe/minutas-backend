@@ -11,7 +11,9 @@ import {
   Clasificacion,
   EstadoOperativo,
   Rol,
+  EstadoTarea,
 } from "@prisma/client";
+
 
 import {
   registrarAccion,
@@ -83,6 +85,13 @@ export const updateTarea = async (
     if (!tareaActual) {
       return res.status(404).json({
         error: "Tarea no encontrada",
+      });
+    }
+
+    // ── CANDADO DE INMUTABILIDAD: Tareas Cerradas no se tocan ──
+    if (tareaActual.estado === EstadoTarea.CERRADO) {
+      return res.status(400).json({
+        error: "Esta entrada ya ha sido cerrada y no puede ser modificada ni descartada",
       });
     }
 
@@ -182,6 +191,15 @@ export const updateTarea = async (
 
         data.estadoConceptual =
           datos.estadoConceptual;
+
+        // ── KILL SWITCH: Regla de Descarte Operativo ──
+        if (datos.estadoConceptual === 'DESCARTADO') {
+          data.estado = EstadoTarea.CERRADO;
+          data.cerradoAt = new Date();
+          data.estadoOperativo = null;
+          data.fechaVencimiento = null;
+          // Nota: No se toca completadoAt para no ensuciar KPIs de ejecución real.
+        }
       }
     }
 

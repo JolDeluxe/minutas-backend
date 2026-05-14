@@ -64,9 +64,10 @@ const estadoConceptualValues = Object.values(
   EstadoConceptual
 ) as [string, ...string[]];
 
-const estadoOperativoValues = Object.values(
-  EstadoOperativo
-) as [string, ...string[]];
+const estadoOperativoValues = [
+  ...Object.values(EstadoOperativo),
+  "CERRADO",
+] as [string, ...string[]];
 
 const tipoAsignacionValues = Object.values(
   TipoAsignacion
@@ -477,6 +478,15 @@ export const listTareasSchema = z.object({
     periodo: z.enum(["all", "today", "week", "month"]).optional(),
 
     atrasadas: z.preprocess(
+      (v) => {
+        if (v === "true") return true;
+        if (v === "false") return false;
+        return undefined;
+      },
+      z.boolean().optional()
+    ),
+
+    todo: z.preprocess(
       (v) => {
         if (v === "true") return true;
         if (v === "false") return false;

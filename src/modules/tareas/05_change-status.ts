@@ -197,22 +197,24 @@ export const changeEstadoTarea = async (
           EstadoOperativo.EN_PROGRESO;
       }
 
-      if ((estado as EstadoTarea) === EstadoTarea.COMPLETADO) {
-        dataUpdate.estadoOperativo =
-          EstadoOperativo.COMPLETADO;
+      const esAsignado = tarea.asignaciones.some(a => a.usuarioId === usuarioId);
 
-        // NO forzar estadoConceptual a CERRADO.
-        // El eje conceptual se gestiona independientemente.
-
-        dataUpdate.completadoAt =
-          new Date();
+      if (estado === EstadoTarea.COMPLETADO) {
+        if (esAsignado) {
+          // AUTO-APROBACIÓN: Se registra fin para métricas pero se archiva de una vez
+          dataUpdate.estado = EstadoTarea.CERRADO;
+          dataUpdate.estadoOperativo = null;
+          dataUpdate.completadoAt = new Date();
+          dataUpdate.cerradoAt = new Date();
+        } else {
+          dataUpdate.estadoOperativo = EstadoOperativo.COMPLETADO;
+          dataUpdate.completadoAt = new Date();
+        }
       }
 
-      if (
-        estado === EstadoTarea.CERRADO
-      ) {
-        dataUpdate.cerradoAt =
-          new Date();
+      if (estado === EstadoTarea.CERRADO) {
+        dataUpdate.cerradoAt = new Date();
+        dataUpdate.estadoOperativo = null; // KILL SWITCH
       }
 
       await prisma.tarea.update({

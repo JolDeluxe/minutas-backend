@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import { Prisma, EstadoTarea } from "@prisma/client";
+import { Prisma, EstadoTarea, EstadoOperativo } from "@prisma/client";
 
 import { prisma } from "../../db";
 
@@ -30,19 +30,25 @@ export const listTareas = async (
     const skip =
       (page - 1) * limit;
 
-    // 1. Construir el filtro base que respeta TODO (incluyendo el estado seleccionado)
-    const where =
-      buildTareasWhere(query, usuario);
+    // 1. Construir el filtro base para la lista principal
+    const where = buildTareasWhere(query, usuario);
 
-    // 2. Construir el filtro para el resumen (ignora el estado seleccionado para que los contadores no cambien)
-    const whereParaResumen: Prisma.TareaWhereInput = { ...where };
-    delete whereParaResumen.estadoOperativo;
+    // 2. Construir el filtro para el resumen
+    // Quitamos los filtros de estado para que los contadores no se auto-filtren,
+    // pero mantenemos todo el resto del contexto (búsqueda, área, formalizada, etc.)
+    const queryParaResumen = { ...query, todo: true };
+    delete (queryParaResumen as any).estadoOperativo;
+    delete (queryParaResumen as any).estado;
+    delete (queryParaResumen as any).estadoConceptual;
+    delete (queryParaResumen as any).atrasadas;
+
+    const whereParaResumen = buildTareasWhere(queryParaResumen, usuario);
 
     const orderBy =
       (sort ??
         [{ createdAt: "desc" }]) as Prisma.TareaOrderByWithRelationInput[];
 
-    const [total, tareas, counts, totalAtrasadas, totalParaResumen] =
+    const [total, tareas, counts, totalAtrasadas, totalActivas, totalCerradas] =
       await prisma.$transaction([
         // Total real filtrado (para paginación)
         prisma.tarea.count({
@@ -112,11 +118,13 @@ export const listTareas = async (
         }),
 
         // Conteos por estado operativo (basado en whereParaResumen)
+        // EXCLUIMOS físicamente las CERRADAS para que no ensucien los conteos operativos
         prisma.tarea.groupBy({
           by: ["estadoOperativo"],
           where: {
             ...whereParaResumen,
-            estadoOperativo: { not: null }
+            estadoOperativo: { not: null },
+            estado: { not: EstadoTarea.CERRADO } 
           },
           _count: {
             _all: true
@@ -126,7 +134,7 @@ export const listTareas = async (
           }
         }),
 
-        // Total de atrasadas (basado en whereParaResumen o where? usualmente global)
+        // Total de atrasadas (basado en whereParaResumen)
         prisma.tarea.count({
           where: {
             ...whereParaResumen,
@@ -135,9 +143,22 @@ export const listTareas = async (
           }
         }),
 
-        // Total "Real" para el primer botón del SummaryBar
+        // Total "Real" para el primer botón del SummaryBar (Solo Activas: Pendiente + Proceso)
+        // También excluimos CERRADAS por seguridad
         prisma.tarea.count({
-          where: whereParaResumen
+          where: {
+            ...whereParaResumen,
+            estado: { not: EstadoTarea.CERRADO },
+            estadoOperativo: { in: [EstadoOperativo.PENDIENTE, EstadoOperativo.EN_PROGRESO] }
+          }
+        }),
+
+        // Conteo específico de Cerradas (estado físico CERRADO)
+        prisma.tarea.count({
+          where: {
+            ...whereParaResumen,
+            estado: EstadoTarea.CERRADO
+          }
         })
       ]);
 
@@ -148,6 +169,9 @@ export const listTareas = async (
       }
       return acc;
     }, {} as Record<string, number>);
+
+    // Añadir el conteo de cerradas al objeto de counts
+    countsObj['CERRADO'] = totalCerradas;
 
     // Enriquecer tareas con isOverdue y responsables aplanados
     const now = new Date();
@@ -171,7 +195,7 @@ export const listTareas = async (
       data: {
         total,
 
-        totalFiltrado: totalParaResumen,
+        totalFiltrado: totalActivas,
 
         page,
 

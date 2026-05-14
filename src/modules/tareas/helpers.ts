@@ -157,11 +157,25 @@ export const buildTareasWhere = (
     };
   }
 
-  if (query.estadoOperativo?.length) {
-    where.estadoOperativo = {
-      in:
-        query.estadoOperativo as EstadoOperativo[],
-    };
+  // ── ESTADO OPERATIVO / KILL SWITCH (REFUERZO FINAL) ─────────
+  if (query.estadoOperativo) {
+    const estados = Array.isArray(query.estadoOperativo) 
+      ? query.estadoOperativo 
+      : [query.estadoOperativo];
+
+    if (estados.includes('CERRADO' as any)) {
+      // Si pedimos CERRADO, ignoramos flujo operativo y vamos directo al estado físico
+      where.estado = EstadoTarea.CERRADO;
+    } else {
+      // Si pedimos cualquier otro, filtramos operativo y bloqueamos CERRADAS
+      where.estadoOperativo = { in: estados as EstadoOperativo[] };
+      where.estado = { not: EstadoTarea.CERRADO };
+    }
+  } 
+  else if (!query.atrasadas && !query.estado && !(query as any).todo) {
+    // Por defecto: Solo activas y que NO estén cerradas
+    where.estadoOperativo = { in: [EstadoOperativo.PENDIENTE, EstadoOperativo.EN_PROGRESO] };
+    where.estado = { not: EstadoTarea.CERRADO };
   }
 
   if (query.area?.length) {
@@ -251,10 +265,20 @@ export const buildTareasWhere = (
   }
 
   // ─────────────────────────────────────────────────────────
-  // ATRASADAS (NUEVO)
+  // ATRASADAS (Solo aplica si no estamos viendo ya terminadas)
   // ─────────────────────────────────────────────────────────
 
-  if (query.atrasadas) {
+  const estadosActuales = Array.isArray(query.estadoOperativo)
+    ? query.estadoOperativo
+    : query.estadoOperativo
+    ? [query.estadoOperativo]
+    : [];
+
+  const viendoTerminadas =
+    estadosActuales.includes("COMPLETADO") ||
+    estadosActuales.includes("CERRADO");
+
+  if (query.atrasadas && !viendoTerminadas) {
     where.fechaVencimiento = {
       lt: new Date(),
     };
