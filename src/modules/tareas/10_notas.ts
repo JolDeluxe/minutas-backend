@@ -107,3 +107,50 @@ export const createTareaNota = async (
   }
 };
 
+export const updateTareaNota = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const { id } = req.params;
+    const { contenido } = req.body;
+    const usuarioId = req.user!.id;
+
+    const nota = await prisma.tareaNota.findUnique({
+      where: { id: Number(id) },
+    });
+
+    if (!nota) {
+      return res.status(404).json({ error: "Nota no encontrada" });
+    }
+
+    const updated = await prisma.tareaNota.update({
+      where: { id: Number(id) },
+      data: { contenido },
+    });
+
+    return res.json({ status: "success", data: updated });
+  } catch (error) {
+    await registrarError("ACTUALIZAR_NOTA_TAREA", req.user?.id ?? null, error);
+    return res.status(500).json({ error: "Error al actualizar la nota" });
+  }
+};
+
+export const deleteTareaNota = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const { id } = req.params;
+
+    await prisma.tareaNota.delete({
+      where: { id: Number(id) },
+    });
+
+    return res.json({ status: "success", message: "Nota eliminada" });
+  } catch (error) {
+    await registrarError("ELIMINAR_NOTA_TAREA", req.user?.id ?? null, error);
+    return res.status(500).json({ error: "Error al eliminar la nota" });
+  }
+};
+

@@ -21,7 +21,7 @@ import { changeEstadoTarea } from "../modules/tareas/05_change-status";
 import { deleteTarea }       from "../modules/tareas/06_delete";
 import { addImagenTarea, deleteImagenTarea } from "../modules/tareas/07_imagenes";
 import { generarPdfTarea }   from "../modules/tareas/08_generate-pdf";
-import { createNotaGeneral, createTareaNota } from "../modules/tareas/10_notas";
+import { createNotaGeneral, createTareaNota, updateTareaNota, deleteTareaNota } from "../modules/tareas/10_notas";
 
 const router = Router();
 
@@ -60,5 +60,7 @@ router.delete("/:id/imagenes/:imagenId", validate(imagenIdSchema), deleteImagenT
 // ── NOTAS ──
 router.post("/notas/general", validate(createNotaGeneralSchema), createNotaGeneral);
 router.post("/notas/tarea", validate(createTareaNotaSchema), createTareaNota);
+router.put("/notas/tarea/:id", updateTareaNota);
+router.delete("/notas/tarea/:id", deleteTareaNota);
 
 export default router;
