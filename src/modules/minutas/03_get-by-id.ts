@@ -51,6 +51,10 @@ export const getMinutaById = async (req: Request, res: Response) => {
     // (evita las 3 queries adicionales de obtenerResumenMinuta)
     const conceptual: Record<string, number> = {};
     const operativo: Record<string, number> = {};
+    const porClasificacion: Record<string, number> = {};
+    const porPrioridad: Record<string, number> = {};
+    let atrasadas = 0;
+    const now = new Date();
 
     // Para el resumen usamos TODAS las tareas (no filtradas por rol)
     // porque el resumen debe reflejar el estado real de la minuta.
@@ -58,7 +62,7 @@ export const getMinutaById = async (req: Request, res: Response) => {
 
     if (usuario.rol === "COORDINADOR") {
       // Si es coordinador, necesitamos los conteos reales (no filtrados)
-      const [conceptos, operativos, total] = await Promise.all([
+      const [conceptos, operativos, total, clasificaciones, prioridades, countAtrasadas] = await Promise.all([
         prisma.tarea.groupBy({
           by: ["estadoConceptual"],
           where: { minutaId: id },
@@ -70,6 +74,23 @@ export const getMinutaById = async (req: Request, res: Response) => {
           _count: { id: true },
         }),
         prisma.tarea.count({ where: { minutaId: id } }),
+        prisma.tarea.groupBy({
+          by: ["clasificacion"],
+          where: { minutaId: id, clasificacion: { not: null } },
+          _count: { id: true },
+        }),
+        prisma.tarea.groupBy({
+          by: ["prioridad"],
+          where: { minutaId: id, prioridad: { not: null } },
+          _count: { id: true },
+        }),
+        prisma.tarea.count({
+          where: {
+            minutaId: id,
+            fechaVencimiento: { lt: now },
+            estado: { notIn: ["COMPLETADO", "CERRADO"] },
+          },
+        }),
       ]);
 
       for (const c of conceptos) {
@@ -78,7 +99,14 @@ export const getMinutaById = async (req: Request, res: Response) => {
       for (const o of operativos) {
         operativo[o.estadoOperativo as string] = o._count.id;
       }
+      for (const cl of clasificaciones) {
+        if (cl.clasificacion) porClasificacion[cl.clasificacion] = cl._count.id;
+      }
+      for (const p of prioridades) {
+        if (p.prioridad) porPrioridad[p.prioridad] = p._count.id;
+      }
       totalEntradas = total;
+      atrasadas = countAtrasadas;
     } else {
       // Para JEFE/GERENCIA, calcular desde las tareas ya cargadas
       for (const t of minuta.tareas) {
@@ -86,10 +114,24 @@ export const getMinutaById = async (req: Request, res: Response) => {
         if (t.estadoOperativo) {
           operativo[t.estadoOperativo] = (operativo[t.estadoOperativo] || 0) + 1;
         }
+        if (t.clasificacion) {
+          porClasificacion[t.clasificacion] = (porClasificacion[t.clasificacion] || 0) + 1;
+        }
+        if (t.prioridad) {
+          porPrioridad[t.prioridad] = (porPrioridad[t.prioridad] || 0) + 1;
+        }
+        if (
+          t.fechaVencimiento &&
+          new Date(t.fechaVencimiento) < now &&
+          t.estado !== "COMPLETADO" &&
+          t.estado !== "CERRADO"
+        ) {
+          atrasadas++;
+        }
       }
     }
 
-    const resumen = { conceptual, operativo, totalEntradas };
+    const resumen = { conceptual, operativo, totalEntradas, atrasadas, porClasificacion, porPrioridad };
 
     return res.json({ status: "success", data: { ...minuta, resumen } });
   } catch (error) {

@@ -41,6 +41,11 @@ export const listMinutasSchema = z.object({
     fechaDesde: isoFecha,
     fechaHasta: isoFecha,
 
+    // ─── FILTROS RÁPIDOS DE PERIODO (Vista Ejecutiva) ───
+    periodo: z.preprocess(pre, z.enum(["today", "week", "month", "year", "all"]).optional()),
+    year:    z.preprocess(pre, z.coerce.number().int().min(2020).max(2100).optional()),
+    month:   z.preprocess(pre, z.coerce.number().int().min(1).max(12).optional()),
+
     // Paginación
     page:  z.coerce.number().min(1).default(1),
     limit: z.coerce.number().min(1).max(100).default(20),
