@@ -10,11 +10,21 @@ export const iniciarMinuta = async (req: Request, res: Response) => {
 
     const minuta = await prisma.minuta.findUnique({
       where: { id },
-      select: { id: true, estado: true, lineaDefault: true, titulo: true },
+      select: { 
+        id: true, 
+        estado: true, 
+        lineaDefault: true, 
+        titulo: true,
+        creadoPor: { select: { departamento: true } }
+      },
     });
 
     if (!minuta) {
       return res.status(404).json({ error: "Minuta no encontrada" });
+    }
+
+    if (req.user!.rol !== "ADMIN" && req.user!.departamento && minuta.creadoPor?.departamento && minuta.creadoPor.departamento !== req.user!.departamento) {
+      return res.status(403).json({ error: "No tienes permiso para acceder a esta minuta." });
     }
 
     if (minuta.estado !== "PROGRAMADA") {

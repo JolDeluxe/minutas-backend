@@ -1,7 +1,5 @@
 import { z } from "zod";
-import { Linea, EstadoMinuta } from "@prisma/client";
-
-const lineaValues  = Object.values(Linea)        as [string, ...string[]];
+import { EstadoMinuta } from "@prisma/client";
 const estadoValues = Object.values(EstadoMinuta) as [string, ...string[]];
 
 const pre = (val: unknown): unknown =>
@@ -21,7 +19,7 @@ const isoFecha = z.coerce.date({
 export const createMinutaSchema = z.object({
   body: z.object({
     titulo:       z.string().min(3, "El título debe tener al menos 3 caracteres").max(200),
-    lineaDefault: z.enum(lineaValues, { message: "Línea inválida" }),
+    lineaDefault: z.string().optional(),
     fechaProgramada: z.string().datetime({ message: "Fecha programada inválida" }),
     iniciarInmediatamente: z.boolean().optional().default(false),
   }),
@@ -34,7 +32,7 @@ export const listMinutasSchema = z.object({
 
     // Filtros multi-valor vía CSV
     estado:       z.preprocess(parseCsv, z.array(z.enum(estadoValues)).optional()),
-    lineaDefault: z.preprocess(parseCsv, z.array(z.enum(lineaValues)).optional()),
+    lineaDefault: z.preprocess(parseCsv, z.array(z.string()).optional()),
 
     // Filtro por creador
     creadoPorId: z.preprocess(pre, z.coerce.number().int().positive().optional()),

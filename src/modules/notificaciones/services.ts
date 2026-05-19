@@ -1,4 +1,4 @@
-import { Rol, EstadoTarea, TipoNotificacion, Linea, Estatus, Area } from "@prisma/client";
+import { Rol, EstadoTarea, TipoNotificacion, Estatus, Area } from "@prisma/client";
 import { prisma } from "../../db";
 import { registrarError } from "../../utils/logger";
 import { persistirYEmitir } from "./helper";
@@ -6,7 +6,7 @@ import type { TareaConRelaciones } from "./types";
 
 // ── Helpers Internos ──────────────────────────────────────────────────────────
 
-const obtenerJefesPorLinea = async (linea: Linea | null): Promise<number[]> => {
+const obtenerJefesPorLinea = async (linea: string | null): Promise<number[]> => {
   const usuarios = await prisma.usuario.findMany({
     where: {
       rol: Rol.JEFE,
@@ -39,11 +39,11 @@ const recortar = (texto: string, max = 70): string =>
  */
 export const notificarNuevasTareas = async (
   minutaId: number | null,
-  lineasAfectadas: (Linea | null)[],
+  lineasAfectadas: (string | null)[],
   cantidad: number
 ): Promise<void> => {
   try {
-    const lineasUnicas = [...new Set(lineasAfectadas.filter(Boolean))] as Linea[];
+    const lineasUnicas = [...new Set(lineasAfectadas.filter(Boolean))] as string[];
 
     const idsJefesSet = new Set<number>();
 
@@ -84,7 +84,7 @@ export const notificarAsignacion = async (
   tareaId: number,
   idsNuevosResponsables: number[],
   descripcion: string,
-  linea: Linea | null
+  linea: string | null
 ): Promise<void> => {
   if (idsNuevosResponsables.length === 0) return;
 
@@ -178,8 +178,8 @@ export const notificarCambioEstado = async (
 export const notificarLineaCambiada = async (
   tareaId: number,
   descripcion: string,
-  lineaAnterior: Linea | null,
-  lineaNueva: Linea | null
+  lineaAnterior: string | null,
+  lineaNueva: string | null
 ): Promise<void> => {
   if (!lineaNueva || lineaAnterior === lineaNueva) return;
 
@@ -208,7 +208,7 @@ export const notificarVencimientoProximo = async (
   tareas: Array<{
     id: number;
     descripcion: string;
-    linea: Linea | null;
+    linea: string | null;
     fechaVencimiento: Date;
     asignaciones: Array<{ usuario: { id: number } }>;
   }>

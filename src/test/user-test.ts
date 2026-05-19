@@ -5,7 +5,6 @@ import bcrypt from "bcryptjs";
 import {
   Rol,
   Area,
-  Linea,
 } from "@prisma/client";
 
 const prisma = new PrismaClient();
@@ -21,7 +20,7 @@ const luchadores = [
     username: "john.cena",
     email: "john.cena@wwe.test",
     rol: Rol.GERENCIA,
-    linea: Linea.CALZADO,
+    linea: "CALZADO",
   },
 
   {
@@ -29,7 +28,7 @@ const luchadores = [
     username: "the.undertaker",
     email: "the.undertaker@wwe.test",
     rol: Rol.JEFE,
-    linea: Linea.BOTA,
+    linea: "BOTA",
   },
 
   {
@@ -37,7 +36,7 @@ const luchadores = [
     username: "triple.h",
     email: "triple.h@wwe.test",
     rol: Rol.JEFE,
-    linea: Linea.ROPA,
+    linea: "ROPA",
   },
 
   {
@@ -45,7 +44,7 @@ const luchadores = [
     username: "shawn.michaels",
     email: "shawn.michaels@wwe.test",
     rol: Rol.COORDINADOR,
-    linea: Linea.ACCESORIOS,
+    linea: "ACCESORIOS",
   },
 
   {
@@ -53,7 +52,7 @@ const luchadores = [
     username: "steve.austin",
     email: "steve.austin@wwe.test",
     rol: Rol.COORDINADOR,
-    linea: Linea.CALZADO,
+    linea: "CALZADO",
   },
 
   {
@@ -61,7 +60,7 @@ const luchadores = [
     username: "dwayne.johnson",
     email: "dwayne.johnson@wwe.test",
     rol: Rol.COORDINADOR,
-    linea: Linea.BOTA,
+    linea: "BOTA",
   },
 
   {
@@ -69,7 +68,7 @@ const luchadores = [
     username: "roman.reigns",
     email: "roman.reigns@wwe.test",
     rol: Rol.COORDINADOR,
-    linea: Linea.ROPA,
+    linea: "ROPA",
   },
 
   {
@@ -77,7 +76,7 @@ const luchadores = [
     username: "seth.rollins",
     email: "seth.rollins@wwe.test",
     rol: Rol.COORDINADOR,
-    linea: Linea.ACCESORIOS,
+    linea: "ACCESORIOS",
   },
 
   {
@@ -85,7 +84,7 @@ const luchadores = [
     username: "randy.orton",
     email: "randy.orton@wwe.test",
     rol: Rol.JEFE,
-    linea: Linea.CALZADO,
+    linea: "CALZADO",
   },
 
   {
@@ -93,7 +92,7 @@ const luchadores = [
     username: "brock.lesnar",
     email: "brock.lesnar@wwe.test",
     rol: Rol.COORDINADOR,
-    linea: Linea.BOTA,
+    linea: "BOTA",
   },
 ];
 

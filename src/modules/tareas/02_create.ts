@@ -5,9 +5,7 @@ import { prisma } from "../../db";
 
 import {
   Area,
-  Linea,
   Prioridad,
-  Clasificacion,
   EstadoConceptual,
   EstadoMinuta,
   EstadoOperativo,
@@ -164,7 +162,7 @@ export const crearTarea = async (
         }
 
         const capturaCompleta = calcularCapturaCompleta({
-          clasificacion: (tareaInput.clasificacion as Clasificacion | undefined) ?? null,
+          clasificacion: (tareaInput.clasificacion as string | undefined) ?? null,
           fechaVencimiento: finalFechaVenc,
           totalAsignaciones,
         });
@@ -189,7 +187,7 @@ export const crearTarea = async (
             departamento: departamento,
             area: (tareaInput.area as Area | undefined) ?? Area.DISENO,
             prioridad: finalPrioridad,
-            linea: (tareaInput.linea as Linea | undefined) ?? null,
+            linea: (tareaInput.linea as string | undefined) ?? null,
             clasificacion: tareaInput.clasificacion ?? "OTROS",
             fechaVencimiento: finalFechaVenc,
             fechaSeguimiento: finalFechaSeguimiento,

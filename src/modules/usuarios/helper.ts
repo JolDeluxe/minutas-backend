@@ -1,4 +1,4 @@
-import { Rol, Estatus, Departamento, Linea, Prisma } from "@prisma/client";
+import { Rol, Estatus, Departamento, Prisma } from "@prisma/client";
 import type { ListUsuariosQuery } from "./zod";
 
 export const getSecurityFilters = (
@@ -140,7 +140,7 @@ export const buildUsuariosWhere = (
     }
   }
 
-  if (query.linea?.length) where.linea = { in: query.linea as Linea[] };
+  if (query.linea?.length) where.linea = { in: query.linea as string[] };
 
   if (query.createdDesde || query.createdHasta) {
     const f: { gte?: Date; lte?: Date } = {};

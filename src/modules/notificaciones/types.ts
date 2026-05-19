@@ -1,4 +1,4 @@
-import type { Tarea, Usuario, TareaAsignacion, Linea } from "@prisma/client";
+import type { Tarea, Usuario, TareaAsignacion } from "@prisma/client";
 
 export interface PayloadBase {
   titulo: string;

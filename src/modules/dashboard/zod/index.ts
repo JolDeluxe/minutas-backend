@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { Clasificacion, EstadoTarea, Linea, Prioridad } from "@prisma/client";
+import { EstadoTarea, Prioridad } from "@prisma/client";
 
 const pre = (val: unknown): unknown =>
   val === "" || val === "null" || val === "undefined" ? undefined : val;
@@ -26,8 +26,6 @@ const isoFecha = z.coerce.date({
 }).optional();
 
 const estadoValues = Object.values(EstadoTarea) as [string, ...string[]];
-const lineaValues = Object.values(Linea) as [string, ...string[]];
-const clasificacionValues = Object.values(Clasificacion) as [string, ...string[]];
 const prioridadValues = Object.values(Prioridad) as [string, ...string[]];
 
 const rangosPermitidos = [
@@ -58,8 +56,8 @@ export const dashboardFiltrosSchema = z.object({
       creadoPorId: z.preprocess(pre, z.coerce.number().int().positive().optional()),
       responsableId: z.preprocess(pre, z.coerce.number().int().positive().optional()),
       estado: z.preprocess(parseCsv, z.array(z.enum(estadoValues)).optional()),
-      linea: z.preprocess(parseCsv, z.array(z.enum(lineaValues)).optional()),
-      clasificacion: z.preprocess(parseCsv, z.array(z.enum(clasificacionValues)).optional()),
+      linea: z.preprocess(parseCsv, z.array(z.string()).optional()),
+      clasificacion: z.preprocess(parseCsv, z.array(z.string()).optional()),
       prioridad: z.preprocess(parseCsv, z.array(z.enum(prioridadValues)).optional()),
       capturaCompleta: z.preprocess(parseBoolean, z.boolean().optional()),
       soloEntregadas: z.preprocess(parseBoolean, z.boolean().optional()),

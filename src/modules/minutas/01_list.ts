@@ -12,7 +12,7 @@ export const listarMinutas = async (req: Request, res: Response) => {
     const { page, limit, sort } = query;
     const offset             = (page - 1) * limit;
 
-    const where = buildMinutasWhere(query);
+    const where = buildMinutasWhere(query, req.user);
 
     const formattedSort = (sort || []).map((item: any) => {
       const newItem: any = {};

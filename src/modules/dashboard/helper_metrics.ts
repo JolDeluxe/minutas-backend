@@ -1,8 +1,6 @@
 import {
   Area,
-  type Clasificacion,
   type EstadoTarea,
-  type Linea,
   type Prisma,
   type PrismaClient,
   type Prioridad,
@@ -198,9 +196,11 @@ export const buildDashboardWhere = (query: DashboardFiltrosQuery): Prisma.TareaW
   if (query.minutaId != null) where.minutaId = query.minutaId;
   if (query.creadoPorId != null) where.creadoPorId = query.creadoPorId;
   if (query.estado?.length) where.estado = { in: query.estado as EstadoTarea[] };
-  if (query.linea?.length) where.linea = { in: query.linea as Linea[] };
+  if (query.linea?.length) where.linea = { in: query.linea as string[] };
   if (query.clasificacion?.length) {
-    where.clasificacion = { in: query.clasificacion as Clasificacion[] };
+    where.clasificacion = { in: query.clasificacion as string[] };
+  } else {
+    where.clasificacion = { not: "POLITICAS" };
   }
   if (query.prioridad?.length) where.prioridad = { in: query.prioridad as Prioridad[] };
   if (query.capturaCompleta != null) where.capturaCompleta = query.capturaCompleta;

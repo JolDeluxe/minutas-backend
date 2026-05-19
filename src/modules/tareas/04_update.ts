@@ -6,9 +6,7 @@ import { prisma } from "../../db";
 
 import {
   Area,
-  Linea,
   Prioridad,
-  Clasificacion,
   EstadoOperativo,
   Rol,
   EstadoTarea,
@@ -135,7 +133,7 @@ export const updateTarea = async (
 
     if (datos.linea !== undefined) {
       const val =
-        (datos.linea ?? null) as Linea | null;
+        (datos.linea ?? null) as string | null;
 
       if (val !== tareaActual.linea) {
         historial.push({
@@ -165,7 +163,7 @@ export const updateTarea = async (
 
     if (datos.clasificacion !== undefined) {
       const val =
-        (datos.clasificacion ?? null) as Clasificacion | null;
+        (datos.clasificacion ?? null) as string | null;
 
       if (val !== tareaActual.clasificacion) {
         historial.push({

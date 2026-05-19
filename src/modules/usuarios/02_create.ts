@@ -1,7 +1,7 @@
 import type { Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import { prisma } from "../../db";
-import { Rol, Departamento, Linea } from "@prisma/client";
+import { Rol, Departamento } from "@prisma/client";
 import type { CreateUsuarioInput } from "./zod";
 import { generarUsername } from "./utils/userGenerator";
 import { validarReglasCreacion } from "./helper";
@@ -72,7 +72,7 @@ export const crearUsuario = async (req: Request, res: Response) => {
         password: hashedPassword,
         rol: rol as Rol,
         departamento: departamento as Departamento | null,
-        linea: linea as Linea | null,
+        linea: linea as string | null,
         imagen: imagenUrl,
       },
       select: { id: true, username: true, email: true, rol: true, nombre: true, departamento: true, linea: true, imagen: true },

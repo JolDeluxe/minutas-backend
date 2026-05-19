@@ -1,7 +1,7 @@
 import type { Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import { prisma } from "../../db";
-import { Rol, Departamento, Linea } from "@prisma/client";
+import { Rol, Departamento } from "@prisma/client";
 import type { UpdateUsuarioInput, UpdateUsuarioParams } from "./zod";
 import { validarReglasEdicion } from "./helper";
 import { registrarAccion, registrarError } from "../../utils/logger";
@@ -82,7 +82,7 @@ export const updateUsuario = async (req: Request, res: Response) => {
       if (datos.rol !== undefined) dataToUpdate.rol = datos.rol as Rol;
       if (datos.estado !== undefined) dataToUpdate.estado = datos.estado;
       if (datos.departamento !== undefined) dataToUpdate.departamento = datos.departamento as Departamento | null;
-      if (datos.linea !== undefined) dataToUpdate.linea = datos.linea as Linea | null;
+      if (datos.linea !== undefined) dataToUpdate.linea = datos.linea as string | null;
     }
 
     const usuarioActualizado = await prisma.usuario.update({

@@ -1,12 +1,10 @@
 import {
   Area,
-  Clasificacion,
   Departamento,
   EstadoConceptual,
   EstadoMinuta,
   EstadoOperativo,
   EstadoTarea,
-  Linea,
   Prioridad,
   Prisma,
   Rol,
@@ -31,7 +29,7 @@ export const calcularIsExternalArea = (
 };
 
 export const calcularCapturaCompleta = (params: {
-  clasificacion: Clasificacion | null | undefined;
+  clasificacion: string | null | undefined;
   fechaVencimiento: Date | null | undefined;
   totalAsignaciones: number;
 }): boolean => {
@@ -127,7 +125,7 @@ export const buildTareasWhere = (
     id: number;
     rol: Rol;
     departamento?: Departamento | null;
-    linea?: Linea | null;
+    linea?: string | null;
   }
 ): Prisma.TareaWhereInput => {
   const where: Prisma.TareaWhereInput = {};
@@ -198,14 +196,17 @@ export const buildTareasWhere = (
 
   if (query.linea?.length) {
     where.linea = {
-      in: query.linea as Linea[],
+      in: query.linea as string[],
     };
   }
 
   if (query.clasificacion?.length) {
     where.clasificacion = {
-      in:
-        query.clasificacion as Clasificacion[],
+      in: query.clasificacion as string[],
+    };
+  } else if (!query.minutaId) {
+    where.clasificacion = {
+      not: "POLITICAS",
     };
   }
 
@@ -237,9 +238,31 @@ export const buildTareasWhere = (
       query.capturaCompleta;
   }
 
-  if (query.requiereSeguimiento != null) {
-    where.requiereSeguimiento =
-      query.requiereSeguimiento;
+  if (query.requiereSeguimiento !== undefined) {
+    where.requiereSeguimiento = query.requiereSeguimiento;
+    
+    // Si se están consultando recordatorios (requiereSeguimiento = false)
+    if (query.requiereSeguimiento === false && usuario.rol !== Rol.ADMIN) {
+      // Regla de Visibilidad Especial:
+      // Sólo se ven recordatorios sin asignar (globales por departamento) o asignados específicamente a mí.
+      where.OR = [
+        {
+          asignaciones: {
+            none: {},
+          },
+        },
+        {
+          asignaciones: {
+            some: {
+              usuarioId: usuario.id,
+            },
+          },
+        },
+      ];
+    }
+  } else if (!query.minutaId) {
+    // Por defecto (si no se pide recordatorio ni minuta específica), sólo tareas reales
+    where.requiereSeguimiento = true;
   }
 
   if (query.formalizada !== undefined) {

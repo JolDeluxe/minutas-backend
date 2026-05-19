@@ -1,10 +1,9 @@
 import { z } from "zod";
-import { Rol, Estatus, Departamento, Linea } from "@prisma/client";
+import { Rol, Estatus, Departamento } from "@prisma/client";
 
 const rolesArray   = Object.values(Rol)     as [string, ...string[]];
 const estatusArray = Object.values(Estatus) as [string, ...string[]];
 const departamentosArray = Object.values(Departamento) as [string, ...string[]];
-const lineasArray  = Object.values(Linea)   as [string, ...string[]];
 
 const pre = (val: unknown): unknown =>
   val === "" || val === "null" || val === "undefined" ? undefined : val;
@@ -25,7 +24,7 @@ export const listUsuariosSchema = z.object({
     q:            z.string().optional(),
     rol:          z.preprocess(parseCsv, z.array(z.enum(rolesArray)).optional()),
     departamento: z.preprocess(parseCsv, z.array(z.enum([...departamentosArray, "GLOBAL", "null"] as [string, ...string[]])).optional()),
-    linea:        z.preprocess(parseCsv, z.array(z.enum(lineasArray)).optional()),
+    linea:        z.preprocess(parseCsv, z.array(z.string()).optional()),
     estado:       z.preprocess(pre, z.enum(estatusArray).optional()),
     createdDesde: isoFecha,
     createdHasta: isoFecha,
@@ -75,7 +74,7 @@ export const createUsuarioSchema = z.object({
     ),
     linea: z.preprocess(
       (val) => (val === "null" || val === "" ? null : val),
-      z.enum(lineasArray).nullable().optional()
+      z.string().nullable().optional()
     ),
     imagen: z.preprocess(
       (val) => (val === "null" || val === "" ? null : val),
@@ -109,7 +108,7 @@ export const updateUsuarioSchema = z.object({
       ),
       linea: z.preprocess(
         (val) => (val === "null" || val === "" ? null : val),
-        z.enum(lineasArray).nullable().optional()
+        z.string().nullable().optional()
       ),
     })
     .strict(),

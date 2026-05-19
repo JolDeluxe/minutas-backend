@@ -1,6 +1,5 @@
 import type { Request, Response } from "express";
 import { prisma } from "../../db";
-import { Linea } from "@prisma/client";
 import { registrarAccion, registrarError } from "../../utils/logger";
 import { USUARIO_SELECT_BASICO } from "../shared-selects";
 import type { CreateMinutaInput } from "./zod";
@@ -12,7 +11,7 @@ export const crearMinuta = async (req: Request, res: Response) => {
 
     const data: any = {
       titulo,
-      lineaDefault: lineaDefault as Linea,
+      lineaDefault: lineaDefault as string,
       creadoPorId:  usuarioId,
       fechaProgramada: new Date(fechaProgramada),
     };
@@ -24,7 +23,7 @@ export const crearMinuta = async (req: Request, res: Response) => {
       // Find previous
       const anterior = await prisma.minuta.findFirst({
         where: {
-          lineaDefault: lineaDefault as Linea,
+          lineaDefault: lineaDefault as string,
           estado: { in: ["CERRADA", "EN_REVISION"] }
         },
         orderBy: {

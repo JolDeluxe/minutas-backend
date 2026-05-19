@@ -48,6 +48,10 @@ export const getMinutaById = async (req: Request, res: Response) => {
       return res.status(404).json({ error: "Minuta no encontrada" });
     }
 
+    if (usuario.rol !== "ADMIN" && usuario.departamento && minuta.creadoPor?.departamento && minuta.creadoPor.departamento !== usuario.departamento) {
+      return res.status(403).json({ error: "No tienes permiso para acceder a esta minuta." });
+    }
+
     // Calcular resumen inline desde las tareas ya cargadas
     // (evita las 3 queries adicionales de obtenerResumenMinuta)
     const conceptual: Record<string, number> = {};

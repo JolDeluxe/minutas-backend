@@ -35,23 +35,6 @@ enum Area {
   DIRECCION_TIENDAS
 }
 
-enum Linea {
-  CALZADO
-  BOTA
-  ROPA
-  ACCESORIOS
-}
-
-enum Clasificacion {
-  IDEA
-  INVESTIGACION
-  CORRECCION
-  ANALISIS
-  MUESTRA
-  POLITICAS
-  OTROS
-}
-
 enum Prioridad {
   BAJA
   MEDIA
@@ -125,9 +108,9 @@ model Usuario {
   estado Estatus @default(ACTIVO)
 
   departamento Departamento?
-  linea        Linea?
+  linea        String?
 
-  dummyClasificacion Clasificacion?
+  dummyClasificacion String?
 
   mustChangePassword Boolean @default(false)
 
@@ -157,7 +140,7 @@ model Usuario {
 model Minuta {
   id           Int          @id @default(autoincrement())
   titulo       String       @db.VarChar(200)
-  lineaDefault Linea
+  lineaDefault String?
   estado       EstadoMinuta @default(PROGRAMADA)
 
   fechaProgramada DateTime
@@ -224,7 +207,7 @@ model Tarea {
 
   // Fase 1: captura ligera durante junta.
   area                Area      @default(DISENO)
-  linea               Linea?
+  linea               String?
   clasificacion       String
   fechaSeguimiento    DateTime?
   requiereSeguimiento Boolean   @default(false)

@@ -1,4 +1,4 @@
-import { Rol, Linea, Area, Departamento } from "@prisma/client";
+import { Rol, Area, Departamento } from "@prisma/client";
 
 export interface TokenPayload {
   id: number;
@@ -6,7 +6,7 @@ export interface TokenPayload {
   email: string | null;
   rol: Rol;
   nombre: string;
-  linea: Linea | null;
+  linea: string | null;
   departamento: Departamento | null;
 }
 

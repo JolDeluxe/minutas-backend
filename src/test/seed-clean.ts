@@ -1,4 +1,4 @@
-import { PrismaClient, Rol, Departamento, Linea } from "@prisma/client";
+import { PrismaClient, Rol, Departamento } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
@@ -64,7 +64,7 @@ async function main() {
       password: hashedPassword,
       rol: Rol.JEFE,
       departamento: Departamento.DISENO,
-      linea: Linea.BOTA,
+      linea: "BOTA",
       estado: "ACTIVO"
     }
   });
@@ -78,7 +78,7 @@ async function main() {
       password: hashedPassword,
       rol: Rol.COORDINADOR,
       departamento: Departamento.DISENO,
-      linea: Linea.CALZADO,
+      linea: "CALZADO",
       estado: "ACTIVO"
     }
   });
@@ -107,7 +107,7 @@ async function main() {
       password: hashedPassword,
       rol: Rol.JEFE,
       departamento: Departamento.MARKETING,
-      linea: Linea.ROPA,
+      linea: "ROPA",
       estado: "ACTIVO"
     }
   });

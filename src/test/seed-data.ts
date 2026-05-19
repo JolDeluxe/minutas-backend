@@ -3,8 +3,6 @@
 import {
   PrismaClient,
   Area,
-  Linea,
-  Clasificacion,
   Prioridad,
   EstadoTarea,
   EstadoAsignacion,
@@ -48,13 +46,9 @@ const FECHA_INICIO =
 
 const FECHA_FIN = new Date();
 
-const lineas =
-  Object.values(Linea);
+const lineas = [ "CALZADO", "BOTA", "ROPA", "ACCESORIOS", "OTROS" ];
 
-const clasificaciones =
-  Object.values(
-    Clasificacion
-  );
+const clasificaciones = [ "IDEA", "INVESTIGACION", "CORRECCION", "ANALISIS", "MUESTRA", "POLITICAS", "OTROS", "REDES_SOCIALES", "DISENO_INSUMOS", "TIENDAS", "CATALOGOS" ];
 
 const prioridades =
   Object.values(Prioridad);

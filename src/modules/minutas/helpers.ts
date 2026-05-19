@@ -2,8 +2,9 @@ import {
   EstadoConceptual,
   EstadoOperativo,
   EstadoMinuta,
-  Linea,
   Prisma,
+  Rol,
+  Departamento,
 } from "@prisma/client";
 
 import { prisma } from "../../db";
@@ -90,9 +91,20 @@ export const obtenerResumenMinuta = async (
  * para el listado de minutas.
  */
 export const buildMinutasWhere = (
-  query: ListMinutasQuery
+  query: ListMinutasQuery,
+  usuario?: {
+    rol: Rol;
+    departamento?: Departamento | null;
+  }
 ): Prisma.MinutaWhereInput => {
   const where: Prisma.MinutaWhereInput = {};
+
+  // Aislamiento por departamento si no es ADMIN
+  if (usuario && usuario.rol !== Rol.ADMIN && usuario.departamento) {
+    where.creadoPor = {
+      departamento: usuario.departamento
+    };
+  }
 
   // ─────────────────────────────
   // Búsqueda textual
@@ -116,7 +128,7 @@ export const buildMinutasWhere = (
 
   if (query.lineaDefault?.length) {
     where.lineaDefault = {
-      in: query.lineaDefault as Linea[],
+      in: query.lineaDefault as string[],
     };
   }
 

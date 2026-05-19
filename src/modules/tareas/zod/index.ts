@@ -2,8 +2,6 @@ import { z } from "zod";
 import {
   Area,
   Prioridad,
-  Linea,
-  Clasificacion,
   EstadoTarea,
   EstadoConceptual,
   EstadoOperativo,
@@ -90,8 +88,8 @@ const singleTareaSchema = z.object({
 
   // Captura rápida
   area: z.preprocess(pre, z.nativeEnum(Area).default(Area.DISENO)),
-  linea: z.preprocess(pre, z.nativeEnum(Linea).optional()),
-  clasificacion: z.preprocess(pre, z.nativeEnum(Clasificacion).optional()),
+  linea: z.preprocess(pre, z.string().optional()),
+  clasificacion: z.preprocess(pre, z.string().optional()),
 
   fechaSeguimiento: isoFecha,
   requiereSeguimiento: z.preprocess(parseBool, z.boolean().optional()),
@@ -139,8 +137,8 @@ export const updateTareaSchema = z.object({
   body: z.object({
     descripcion: z.string().min(3).optional(),
     area: z.preprocess(pre, z.nativeEnum(Area).nullable().optional()),
-    linea: z.preprocess(pre, z.nativeEnum(Linea).nullable().optional()),
-    clasificacion: z.preprocess(pre, z.nativeEnum(Clasificacion).nullable().optional()),
+    linea: z.preprocess(pre, z.string().nullable().optional()),
+    clasificacion: z.preprocess(pre, z.string().nullable().optional()),
     prioridad: z.preprocess(pre, z.nativeEnum(Prioridad).nullable().optional()),
     
     estadoConceptual: z.preprocess(
@@ -213,8 +211,8 @@ export const listTareasSchema = z.object({
     estadoConceptual: z.preprocess(parseCsv, z.array(z.nativeEnum(EstadoConceptual)).optional()),
     estadoOperativo: z.preprocess(parseCsv, z.array(estadoOperativoSchema).optional()),
     area: z.preprocess(parseCsv, z.array(z.nativeEnum(Area)).optional()),
-    linea: z.preprocess(parseCsv, z.array(z.nativeEnum(Linea)).optional()),
-    clasificacion: z.preprocess(parseCsv, z.array(z.nativeEnum(Clasificacion)).optional()),
+    linea: z.preprocess(parseCsv, z.array(z.string()).optional()),
+    clasificacion: z.preprocess(parseCsv, z.array(z.string()).optional()),
     prioridad: z.preprocess(parseCsv, z.array(z.nativeEnum(Prioridad)).optional()),
     
     minutaId: z.preprocess(pre, z.coerce.number().int().positive().optional()),
