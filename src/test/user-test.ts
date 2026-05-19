@@ -126,8 +126,8 @@ async function main() {
           rol:
             user.rol,
 
-          area:
-            Area.DISENO,
+          departamento:
+            "DISENO",
 
           linea:
             user.linea,
@@ -152,8 +152,8 @@ async function main() {
           rol:
             user.rol,
 
-          area:
-            Area.DISENO,
+          departamento:
+            "DISENO",
 
           linea:
             user.linea,

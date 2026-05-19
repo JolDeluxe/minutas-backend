@@ -12,14 +12,17 @@ export const inicializarSistema = async () => {
     const admin = await prisma.usuario.upsert({
       where: { username: env.SYS_ADMIN_USER },
       update: {
-        rol: Rol.GERENCIA,
+        rol: Rol.ADMIN,
+        departamento: null,
+        password: hashedPassword,
       },
       create: {
         nombre: "Administrador del Sistema",
         username: env.SYS_ADMIN_USER,
         email: null,
         password: hashedPassword,
-        rol: Rol.GERENCIA,
+        rol: Rol.ADMIN,
+        departamento: null,
       },
     });
 

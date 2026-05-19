@@ -10,9 +10,15 @@ datasource db {
 // ─── ENUMS ───────────────────────────────────────────────
 
 enum Rol {
+  ADMIN
   GERENCIA
   JEFE
   COORDINADOR
+}
+
+enum Departamento {
+  DISENO
+  MARKETING
 }
 
 enum Estatus {
@@ -22,6 +28,7 @@ enum Estatus {
 
 enum Area {
   DISENO
+  MARKETING
   DIRECCION_MBC
   DIRECCION_CFI
   DIRECCION_ADJUNTA
@@ -84,8 +91,11 @@ enum EstadoAsignacion {
 }
 
 enum EstadoMinuta {
+  PROGRAMADA
   ACTIVA
+  EN_REVISION
   CERRADA
+  CANCELADA
 }
 
 enum TipoEventoEntrada {
@@ -114,13 +124,16 @@ model Usuario {
   rol    Rol     @default(COORDINADOR)
   estado Estatus @default(ACTIVO)
 
-  area  Area   @default(DISENO)
-  linea Linea?
+  departamento Departamento?
+  linea        Linea?
+
+  dummyClasificacion Clasificacion?
 
   mustChangePassword Boolean @default(false)
 
   minutasCreadas        Minuta[]             @relation("MinutaCreador")
   minutasCerradas       Minuta[]             @relation("MinutaCerrador")
+  minutasCanceladas     Minuta[]             @relation("MinutaCancelador")
   tareasCreadas         Tarea[]              @relation("TareaCreador")
   tareasFormalizadas    Tarea[]              @relation("TareaFormalizador")
   asignaciones          TareaAsignacion[]
@@ -145,8 +158,10 @@ model Minuta {
   id           Int          @id @default(autoincrement())
   titulo       String       @db.VarChar(200)
   lineaDefault Linea
-  estado       EstadoMinuta @default(ACTIVA)
-  fecha        DateTime     @default(now())
+  estado       EstadoMinuta @default(PROGRAMADA)
+
+  fechaProgramada DateTime
+  fechaRealizada  DateTime?
 
   creadoPorId Int
   creadoPor   Usuario @relation("MinutaCreador", fields: [creadoPorId], references: [id], onDelete: Restrict)
@@ -154,6 +169,14 @@ model Minuta {
   cerradoPorId Int?
   cerradoPor   Usuario?  @relation("MinutaCerrador", fields: [cerradoPorId], references: [id], onDelete: SetNull)
   cerradoAt    DateTime?
+
+  canceladoPorId Int?
+  canceladoPor   Usuario?  @relation("MinutaCancelador", fields: [canceladoPorId], references: [id], onDelete: SetNull)
+  canceladoAt    DateTime?
+
+  minutaAnteriorId  Int?
+  minutaAnterior    Minuta?  @relation("SiguienteAnterior", fields: [minutaAnteriorId], references: [id])
+  minutasSiguientes Minuta[] @relation("SiguienteAnterior")
 
   tareas         Tarea[]
   notasGenerales NotaGeneral[] // <--- SE AGREGAN LOS POST-ITS A LA MINUTA
@@ -164,7 +187,10 @@ model Minuta {
   @@index([creadoPorId])
   @@index([cerradoPorId])
   @@index([estado])
-  @@index([fecha])
+  @@index([fechaProgramada])
+  @@index([fechaRealizada])
+  @@index([lineaDefault])
+  @@index([minutaAnteriorId])
 }
 
 // <--- NUEVO MODELO: POST-ITS GENERALES DE LA JUNTA
@@ -194,14 +220,16 @@ model Tarea {
   id          Int    @id @default(autoincrement())
   descripcion String @db.Text
 
-  // Fase 1: captura ligera durante junta.
-  area                Area           @default(DISENO)
-  linea               Linea?
-  clasificacion       Clasificacion?
-  fechaSeguimiento    DateTime?
-  requiereSeguimiento Boolean        @default(false)
+  departamento Departamento @default(DISENO)
 
-  // Fase 2: organizacion post-junta y formalizacion progresiva.
+  // Fase 1: captura ligera durante junta.
+  area                Area      @default(DISENO)
+  linea               Linea?
+  clasificacion       String
+  fechaSeguimiento    DateTime?
+  requiereSeguimiento Boolean   @default(false)
+
+  // Fase 2: organizacion post-junta and formalizacion progresiva.
   estadoConceptual EstadoConceptual @default(CAPTURADO)
   formalizada      Boolean          @default(false)
   formalizadoAt    DateTime?
@@ -243,6 +271,7 @@ model Tarea {
   @@index([estadoConceptual])
   @@index([estadoOperativo])
   @@index([area])
+  @@index([departamento])
   @@index([isExternalArea])
   @@index([capturaCompleta])
   @@index([formalizada])

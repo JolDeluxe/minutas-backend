@@ -42,7 +42,7 @@ export const refreshSession = async (req: Request, res: Response) => {
         email: true,
         rol: true,
         nombre: true,
-        area: true,
+        departamento: true,
         linea: true,
         estado: true,
       },
@@ -59,7 +59,7 @@ export const refreshSession = async (req: Request, res: Response) => {
       rol: usuario.rol,
       nombre: usuario.nombre,
       linea: usuario.linea,
-      area: usuario.area,
+      departamento: usuario.departamento,
     };
 
     const accessToken = generateAccessToken(payload);

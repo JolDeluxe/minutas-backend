@@ -14,13 +14,25 @@ export const listarMinutas = async (req: Request, res: Response) => {
 
     const where = buildMinutasWhere(query);
 
+    const formattedSort = (sort || []).map((item: any) => {
+      const newItem: any = {};
+      for (const [key, value] of Object.entries(item)) {
+        if (key === "fecha") {
+          newItem.fechaProgramada = value;
+        } else {
+          newItem[key] = value;
+        }
+      }
+      return newItem;
+    });
+
     const [total, minutas] = await prisma.$transaction([
       prisma.minuta.count({ where }),
       prisma.minuta.findMany({
         where,
         take:    limit,
         skip:    offset,
-        orderBy: sort as Prisma.MinutaOrderByWithRelationInput[],
+        orderBy: formattedSort as Prisma.MinutaOrderByWithRelationInput[],
         include: {
           creadoPor: {
             select: USUARIO_SELECT_BASICO,
@@ -38,6 +50,17 @@ export const listarMinutas = async (req: Request, res: Response) => {
         },
       }),
     ]);
+
+    // ─── Navegación ejecutiva: Última junta y Anterior (GLOBAL, sin filtros) ───
+    const ultimasDosJuntas = await prisma.minuta.findMany({
+      where: { estado: { in: ["ACTIVA", "EN_REVISION", "CERRADA"] } },
+      orderBy: { fechaRealizada: "desc" },
+      take: 2,
+      select: { id: true },
+    });
+
+    const ultimaJuntaId = ultimasDosJuntas[0]?.id ?? null;
+    const juntaAnteriorId = ultimasDosJuntas[1]?.id ?? null;
 
     // Enriquecer cada minuta con resumen operativo para las cards ejecutivas
     const now = new Date();
@@ -73,6 +96,8 @@ export const listarMinutas = async (req: Request, res: Response) => {
 
       return {
         ...minutaSinTareas,
+        isJuntaActual: m.id === ultimaJuntaId,
+        isJuntaAnterior: m.id === juntaAnteriorId,
         resumenOperativo: {
           totalEntradas,
           completadas,
@@ -86,19 +111,6 @@ export const listarMinutas = async (req: Request, res: Response) => {
         },
       };
     });
-
-    // ─── Navegación ejecutiva: Última junta y Anterior (GLOBAL, sin filtros) ───
-    // El dueño necesita saber cuál es la junta más reciente y cuál la anterior
-    // para poder decir "vamos a revisar la junta pasada".
-    // Esto es INDEPENDIENTE de los filtros de la lista.
-    const ultimasDosJuntas = await prisma.minuta.findMany({
-      orderBy: { fecha: "desc" },
-      take: 2,
-      select: { id: true },
-    });
-
-    const ultimaJuntaId = ultimasDosJuntas[0]?.id ?? null;
-    const juntaAnteriorId = ultimasDosJuntas[1]?.id ?? null;
 
     return res.json({
       status: "success",

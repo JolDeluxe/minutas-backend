@@ -32,7 +32,7 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
         nombre: true,
         email: true, 
         rol: true, 
-        area: true,
+        departamento: true,
         linea: true,
         estado: true
       }
@@ -52,7 +52,7 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
       nombre: usuario.nombre,
       email: usuario.email || "",
       rol: usuario.rol,
-      area: usuario.area,
+      departamento: usuario.departamento,
       linea: usuario.linea
     };
 

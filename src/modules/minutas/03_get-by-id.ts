@@ -18,16 +18,17 @@ export const getMinutaById = async (req: Request, res: Response) => {
         // POST-ITS de la junta
         notasGenerales: { orderBy: { createdAt: "desc" } },
         tareas: {
-          // Filtro de visibilidad: COORDINADOR solo ve sus entradas asignadas
-          ...(usuario.rol === "COORDINADOR"
-            ? {
-                where: {
+          where: {
+            ...(usuario.rol !== "ADMIN" && usuario.departamento ? { departamento: usuario.departamento } : {}),
+            ...(usuario.rol !== "ADMIN" && usuario.rol !== "GERENCIA" && usuario.linea ? { linea: usuario.linea } : {}),
+            ...(usuario.rol === "COORDINADOR"
+              ? {
                   asignaciones: {
                     some: { usuarioId: usuario.id },
                   },
-                },
-              }
-            : {}),
+                }
+              : {}),
+          },
           orderBy: { createdAt: "asc" },
           include: {
             imagenes: { orderBy: { orden: "asc" } },
@@ -62,31 +63,39 @@ export const getMinutaById = async (req: Request, res: Response) => {
 
     if (usuario.rol === "COORDINADOR") {
       // Si es coordinador, necesitamos los conteos reales (no filtrados)
+      const whereBase: any = { minutaId: id };
+      if (usuario.departamento) {
+        whereBase.departamento = usuario.departamento;
+      }
+      if (usuario.linea) {
+        whereBase.linea = usuario.linea;
+      }
+
       const [conceptos, operativos, total, clasificaciones, prioridades, countAtrasadas] = await Promise.all([
         prisma.tarea.groupBy({
           by: ["estadoConceptual"],
-          where: { minutaId: id },
+          where: whereBase,
           _count: { id: true },
         }),
         prisma.tarea.groupBy({
           by: ["estadoOperativo"],
-          where: { minutaId: id, estadoOperativo: { not: null } },
+          where: { ...whereBase, estadoOperativo: { not: null } },
           _count: { id: true },
         }),
-        prisma.tarea.count({ where: { minutaId: id } }),
+        prisma.tarea.count({ where: whereBase }),
         prisma.tarea.groupBy({
           by: ["clasificacion"],
-          where: { minutaId: id, clasificacion: { not: null } },
+          where: { ...whereBase, clasificacion: { not: null } },
           _count: { id: true },
         }),
         prisma.tarea.groupBy({
           by: ["prioridad"],
-          where: { minutaId: id, prioridad: { not: null } },
+          where: { ...whereBase, prioridad: { not: null } },
           _count: { id: true },
         }),
         prisma.tarea.count({
           where: {
-            minutaId: id,
+            ...whereBase,
             fechaVencimiento: { lt: now },
             estado: { notIn: ["COMPLETADO", "CERRADO"] },
           },
@@ -133,7 +142,78 @@ export const getMinutaById = async (req: Request, res: Response) => {
 
     const resumen = { conceptual, operativo, totalEntradas, atrasadas, porClasificacion, porPrioridad };
 
-    return res.json({ status: "success", data: { ...minuta, resumen } });
+    let totalValidas = 0;
+    if (usuario.rol === "COORDINADOR") {
+      const whereBaseValidas: any = { minutaId: id, estadoConceptual: { not: "DESCARTADO" } };
+      if (usuario.departamento) {
+        whereBaseValidas.departamento = usuario.departamento;
+      }
+      if (usuario.linea) {
+        whereBaseValidas.linea = usuario.linea;
+      }
+      const countValidas = await prisma.tarea.count({
+        where: whereBaseValidas
+      });
+      totalValidas = countValidas;
+    } else {
+      for (const t of minuta.tareas) {
+        if (t.estadoConceptual !== "DESCARTADO") {
+          totalValidas++;
+        }
+      }
+    }
+    
+    const resumenOperativo = { ...resumen, totalValidas };
+
+    let contextoEjecutivo: any[] = [];
+    if (minuta.minutaAnteriorId) {
+      const whereContexto: any = {
+        minutaId: minuta.minutaAnteriorId,
+        estado: { in: ["PENDIENTE", "EN_PROGRESO"] },
+        estadoConceptual: { not: "DESCARTADO" }
+      };
+      if (usuario.rol !== "ADMIN" && usuario.departamento) {
+        whereContexto.departamento = usuario.departamento;
+      }
+      if (usuario.rol !== "ADMIN" && usuario.rol !== "GERENCIA" && usuario.linea) {
+        whereContexto.linea = usuario.linea;
+      }
+
+      contextoEjecutivo = await prisma.tarea.findMany({
+        where: whereContexto,
+        select: {
+          id: true,
+          descripcion: true,
+          estado: true,
+          estadoOperativo: true,
+          asignaciones: {
+            include: { usuario: { select: USUARIO_SELECT_BASICO } }
+          }
+        }
+      });
+    }
+
+    // Calcular navegación ejecutiva para saber si esta minuta es la Junta Actual o Anterior
+    const ultimasDosJuntas = await prisma.minuta.findMany({
+      where: { estado: { in: ["ACTIVA", "EN_REVISION", "CERRADA"] } },
+      orderBy: { fechaRealizada: "desc" },
+      take: 2,
+      select: { id: true },
+    });
+
+    const isJuntaActual = ultimasDosJuntas[0]?.id === id;
+    const isJuntaAnterior = ultimasDosJuntas[1]?.id === id;
+
+    return res.json({ 
+      status: "success", 
+      data: { 
+        ...minuta, 
+        resumenOperativo, 
+        contextoEjecutivo,
+        isJuntaActual,
+        isJuntaAnterior
+      } 
+    });
   } catch (error) {
     await registrarError("GET_MINUTA_BY_ID", req.user?.id ?? null, error);
     return res.status(500).json({ error: "Error al obtener minuta" });

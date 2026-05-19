@@ -1,6 +1,7 @@
 import {
   Area,
   Clasificacion,
+  Departamento,
   EstadoConceptual,
   EstadoMinuta,
   EstadoOperativo,
@@ -125,10 +126,21 @@ export const buildTareasWhere = (
   usuario: {
     id: number;
     rol: Rol;
+    departamento?: Departamento | null;
     linea?: Linea | null;
   }
 ): Prisma.TareaWhereInput => {
   const where: Prisma.TareaWhereInput = {};
+
+  // Aislamiento por departamento si no es ADMIN
+  if (usuario.rol !== Rol.ADMIN && usuario.departamento) {
+    where.departamento = usuario.departamento;
+  }
+
+  // Aislamiento por línea si no es ADMIN ni GERENCIA, y el usuario tiene una línea asignada
+  if (usuario.rol !== Rol.ADMIN && usuario.rol !== Rol.GERENCIA && usuario.linea) {
+    where.linea = usuario.linea;
+  }
 
   // ─────────────────────────────────────────────────────────
   // SEARCH

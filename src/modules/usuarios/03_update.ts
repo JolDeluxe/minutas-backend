@@ -1,7 +1,7 @@
 import type { Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import { prisma } from "../../db";
-import { Rol, Area, Linea } from "@prisma/client";
+import { Rol, Departamento, Linea } from "@prisma/client";
 import type { UpdateUsuarioInput, UpdateUsuarioParams } from "./zod";
 import { validarReglasEdicion } from "./helper";
 import { registrarAccion, registrarError } from "../../utils/logger";
@@ -19,7 +19,7 @@ export const updateUsuario = async (req: Request, res: Response) => {
     }
 
     try {
-      validarReglasEdicion(solicitante, usuarioActual);
+      validarReglasEdicion(solicitante, usuarioActual, datos as { rol?: Rol; departamento?: Departamento | null });
     } catch (error: any) {
       return res.status(403).json({ error: error.message });
     }
@@ -77,11 +77,11 @@ export const updateUsuario = async (req: Request, res: Response) => {
     // Campos planos
     if (datos.nombre !== undefined) dataToUpdate.nombre = datos.nombre;
 
-    // Rol, estado, área y línea solo los puede cambiar GERENCIA (no en auto-edición)
+    // Rol, estado, departamento y línea solo los puede cambiar GERENCIA (no en auto-edición)
     if (!esMismoUsuario) {
       if (datos.rol !== undefined) dataToUpdate.rol = datos.rol as Rol;
       if (datos.estado !== undefined) dataToUpdate.estado = datos.estado;
-      if (datos.area !== undefined) dataToUpdate.area = datos.area as Area;
+      if (datos.departamento !== undefined) dataToUpdate.departamento = datos.departamento as Departamento | null;
       if (datos.linea !== undefined) dataToUpdate.linea = datos.linea as Linea | null;
     }
 
@@ -90,7 +90,7 @@ export const updateUsuario = async (req: Request, res: Response) => {
       data: dataToUpdate,
       select: {
         id: true, nombre: true, username: true,
-        email: true, rol: true, estado: true, area: true, linea: true, imagen: true,
+        email: true, rol: true, estado: true, departamento: true, linea: true, imagen: true,
       },
     });
 

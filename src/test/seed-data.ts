@@ -115,7 +115,7 @@ async function main() {
   const usuarios =
     await prisma.usuario.findMany({
       where: {
-        area: Area.DISENO,
+        departamento: "DISENO",
       },
     });
 
@@ -178,7 +178,10 @@ async function main() {
               ? EstadoMinuta.ACTIVA
               : EstadoMinuta.CERRADA,
 
-          fecha:
+          fechaProgramada:
+            fechaMinuta,
+
+          fechaRealizada:
             fechaMinuta,
 
           createdAt:

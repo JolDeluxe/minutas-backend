@@ -25,7 +25,7 @@ export const changeStatusUsuario = async (req: Request, res: Response) => {
     const usuarioActualizado = await prisma.usuario.update({
       where: { id },
       data: { estado: estado as Estatus },
-      select: { id: true, nombre: true, username: true, rol: true, estado: true, area: true, linea: true },
+      select: { id: true, nombre: true, username: true, rol: true, estado: true, departamento: true, linea: true },
     });
 
     await registrarAccion(

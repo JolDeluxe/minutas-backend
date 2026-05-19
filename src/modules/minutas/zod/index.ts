@@ -22,6 +22,8 @@ export const createMinutaSchema = z.object({
   body: z.object({
     titulo:       z.string().min(3, "El título debe tener al menos 3 caracteres").max(200),
     lineaDefault: z.enum(lineaValues, { message: "Línea inválida" }),
+    fechaProgramada: z.string().datetime({ message: "Fecha programada inválida" }),
+    iniciarInmediatamente: z.boolean().optional().default(false),
   }),
 });
 
@@ -60,9 +62,11 @@ export const listMinutasSchema = z.object({
         .array(
           z
             .object({
-              fecha:     z.enum(["asc", "desc"]).optional(),
-              titulo:    z.enum(["asc", "desc"]).optional(),
-              createdAt: z.enum(["asc", "desc"]).optional(),
+              fecha:           z.enum(["asc", "desc"]).optional(),
+              fechaProgramada: z.enum(["asc", "desc"]).optional(),
+              fechaRealizada:  z.enum(["asc", "desc"]).optional(),
+              titulo:          z.enum(["asc", "desc"]).optional(),
+              createdAt:       z.enum(["asc", "desc"]).optional(),
             })
             .strict()
         )

@@ -1,9 +1,9 @@
 import { z } from "zod";
-import { Rol, Estatus, Area, Linea } from "@prisma/client";
+import { Rol, Estatus, Departamento, Linea } from "@prisma/client";
 
 const rolesArray   = Object.values(Rol)     as [string, ...string[]];
 const estatusArray = Object.values(Estatus) as [string, ...string[]];
-const areasArray   = Object.values(Area)    as [string, ...string[]];
+const departamentosArray = Object.values(Departamento) as [string, ...string[]];
 const lineasArray  = Object.values(Linea)   as [string, ...string[]];
 
 const pre = (val: unknown): unknown =>
@@ -24,7 +24,7 @@ export const listUsuariosSchema = z.object({
   query: z.object({
     q:            z.string().optional(),
     rol:          z.preprocess(parseCsv, z.array(z.enum(rolesArray)).optional()),
-    area:         z.preprocess(parseCsv, z.array(z.enum(areasArray)).optional()),
+    departamento: z.preprocess(parseCsv, z.array(z.enum([...departamentosArray, "GLOBAL", "null"] as [string, ...string[]])).optional()),
     linea:        z.preprocess(parseCsv, z.array(z.enum(lineasArray)).optional()),
     estado:       z.preprocess(pre, z.enum(estatusArray).optional()),
     createdDesde: isoFecha,
@@ -43,7 +43,7 @@ export const listUsuariosSchema = z.object({
               nombre:    z.enum(["asc", "desc"]).optional(),
               username:  z.enum(["asc", "desc"]).optional(),
               rol:       z.enum(["asc", "desc"]).optional(),
-              area:      z.enum(["asc", "desc"]).optional(),
+              departamento: z.enum(["asc", "desc"]).optional(),
               createdAt: z.enum(["asc", "desc"]).optional(),
             })
             .strict()
@@ -69,7 +69,10 @@ export const createUsuarioSchema = z.object({
     username: z.string().min(3, "El usuario debe tener al menos 3 caracteres").optional(),
     password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres"),
     rol:      z.enum(rolesArray, { message: "Rol inválido" }).default(Rol.COORDINADOR),
-    area:     z.enum(areasArray, { message: "Área inválida" }).default(Area.DISENO),
+    departamento: z.preprocess(
+      (val) => (val === "null" || val === "" ? null : val),
+      z.enum(departamentosArray).nullable().optional()
+    ),
     linea: z.preprocess(
       (val) => (val === "null" || val === "" ? null : val),
       z.enum(lineasArray).nullable().optional()
@@ -100,7 +103,10 @@ export const updateUsuarioSchema = z.object({
       password: z.string().min(6).optional(),
       rol:      z.enum(rolesArray).optional(),
       estado:   z.enum(estatusArray).optional(),
-      area:     z.enum(areasArray).optional(),
+      departamento: z.preprocess(
+        (val) => (val === "null" || val === "" ? null : val),
+        z.enum(departamentosArray).nullable().optional()
+      ),
       linea: z.preprocess(
         (val) => (val === "null" || val === "" ? null : val),
         z.enum(lineasArray).nullable().optional()

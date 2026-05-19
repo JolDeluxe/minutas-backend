@@ -16,7 +16,7 @@ export const compararConAnterior = async (req: Request, res: Response) => {
     // Obtener la minuta actual
     const minutaActual = await prisma.minuta.findUnique({
       where: { id },
-      select: { id: true, titulo: true, fecha: true, lineaDefault: true },
+      select: { id: true, titulo: true, fechaProgramada: true, lineaDefault: true },
     });
 
     if (!minutaActual) {
@@ -28,10 +28,10 @@ export const compararConAnterior = async (req: Request, res: Response) => {
       where: {
         id: { not: id },
         lineaDefault: minutaActual.lineaDefault,
-        fecha: { lt: minutaActual.fecha },
+        fechaProgramada: { lt: minutaActual.fechaProgramada },
       },
-      orderBy: { fecha: "desc" },
-      select: { id: true, titulo: true, fecha: true },
+      orderBy: { fechaProgramada: "desc" },
+      select: { id: true, titulo: true, fechaProgramada: true, fechaRealizada: true },
     });
 
     if (!minutaAnterior) {
@@ -112,7 +112,7 @@ export const compararConAnterior = async (req: Request, res: Response) => {
         minutaAnterior: {
           id: minutaAnterior.id,
           titulo: minutaAnterior.titulo,
-          fecha: minutaAnterior.fecha,
+          fecha: minutaAnterior.fechaRealizada || minutaAnterior.fechaProgramada,
         },
         comparacion: {
           totalAnterior: entradasAnterior.length,

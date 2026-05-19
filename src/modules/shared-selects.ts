@@ -9,7 +9,7 @@ export const USUARIO_SELECT_BASICO = {
   username: true,
   imagen: true,
   rol: true,
-  area: true,
+  departamento: true,
   linea: true,
 } as const;
 

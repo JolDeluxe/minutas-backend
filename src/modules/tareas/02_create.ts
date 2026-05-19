@@ -13,6 +13,7 @@ import {
   EstadoOperativo,
   EstadoTarea,
   TipoAsignacion,
+  Departamento,
 } from "@prisma/client";
 
 import {
@@ -175,15 +176,21 @@ export const crearTarea = async (
         }
         // ------------------------------
 
+        let departamento: Departamento = req.user!.departamento ?? "DISENO";
+        if (req.user!.rol === "ADMIN") {
+          departamento = tareaInput.area === "MARKETING" ? "MARKETING" : "DISENO";
+        }
+
         const nueva = await tx.tarea.create({
           data: {
             descripcion: tareaInput.descripcion,
             creadoPorId: usuarioId,
             minutaId: tareaInput.minutaId ?? null,
+            departamento: departamento,
             area: (tareaInput.area as Area | undefined) ?? Area.DISENO,
             prioridad: finalPrioridad,
             linea: (tareaInput.linea as Linea | undefined) ?? null,
-            clasificacion: (tareaInput.clasificacion as Clasificacion | undefined) ?? null,
+            clasificacion: tareaInput.clasificacion ?? "OTROS",
             fechaVencimiento: finalFechaVenc,
             fechaSeguimiento: finalFechaSeguimiento,
             requiereSeguimiento: finalRequiereSeguimiento,
@@ -267,7 +274,6 @@ export const crearTarea = async (
                     username: true,
                     imagen: true,
                     rol: true,
-                    area: true,
                     linea: true,
                   },
                 },
@@ -280,7 +286,6 @@ export const crearTarea = async (
                 nombre: true,
                 username: true,
                 imagen: true,
-                area: true,
                 linea: true,
               },
             },

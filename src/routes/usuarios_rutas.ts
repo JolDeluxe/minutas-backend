@@ -25,7 +25,7 @@ router.use(authenticate);
 // GET /api/usuarios
 router.get(
   "/",
-  authorize([Rol.GERENCIA, Rol.JEFE]),
+  authorize([Rol.GERENCIA, Rol.ADMIN]),
   validate(listUsuariosSchema),
   listarUsuarios
 );
@@ -40,7 +40,7 @@ router.get(
 // POST /api/usuarios
 router.post(
   "/",
-  authorize([Rol.GERENCIA]),
+  authorize([Rol.GERENCIA, Rol.ADMIN]),
   upload.single("imagen"),
   validate(createUsuarioSchema),
   crearUsuario
@@ -57,7 +57,7 @@ router.put(
 // PATCH /api/usuarios/:id
 router.patch(
   "/:id",
-  authorize([Rol.GERENCIA]),
+  authorize([Rol.GERENCIA, Rol.ADMIN]),
   validate(patchUsuarioSchema),
   changeStatusUsuario
 );

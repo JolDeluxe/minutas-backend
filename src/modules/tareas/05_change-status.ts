@@ -255,7 +255,6 @@ export const changeEstadoTarea = async (
                   username: true,
                   imagen: true,
                   rol: true,
-                  area: true,
                   linea: true,
                 },
               },

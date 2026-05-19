@@ -85,7 +85,8 @@ export const listTareas = async (
                 id: true,
                 titulo: true,
                 estado: true,
-                fecha: true,
+                fechaProgramada: true,
+                fechaRealizada: true,
               },
             },
 
@@ -173,6 +174,16 @@ export const listTareas = async (
     // Añadir el conteo de cerradas al objeto de counts
     countsObj['CERRADO'] = totalCerradas;
 
+    // Consultar últimas dos juntas para enriquecer la relación de minuta
+    const ultimasDosJuntas = await prisma.minuta.findMany({
+      where: { estado: { in: ["ACTIVA", "EN_REVISION", "CERRADA"] } },
+      orderBy: { fechaRealizada: "desc" },
+      take: 2,
+      select: { id: true },
+    });
+    const ultimaJuntaId = ultimasDosJuntas[0]?.id ?? null;
+    const juntaAnteriorId = ultimasDosJuntas[1]?.id ?? null;
+
     // Enriquecer tareas con isOverdue y responsables aplanados
     const now = new Date();
     const tareasConMeta = tareas.map((t: any) => ({
@@ -187,6 +198,13 @@ export const listTareas = async (
         imagen: a.usuario?.imagen,
         rol: a.usuario?.rol,
       })) ?? [],
+      minuta: t.minuta
+        ? {
+            ...t.minuta,
+            isJuntaActual: t.minuta.id === ultimaJuntaId,
+            isJuntaAnterior: t.minuta.id === juntaAnteriorId,
+          }
+        : null,
     }));
 
     return res.json({

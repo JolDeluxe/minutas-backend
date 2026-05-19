@@ -13,7 +13,7 @@ const sharedSelect = {
   imagen:    true,
   rol:       true,
   estado:    true,
-  area:      true,
+  departamento: true,
   linea:     true,
   createdAt: true,
 } satisfies Prisma.UsuarioSelect;
@@ -32,12 +32,18 @@ export const listarUsuarios = async (req: Request, res: Response) => {
     const where  = buildUsuariosWhere(query, securityFilter);
     const offset = (page - 1) * limit;
 
-    const [total, resumenRoles, usuarios] = await Promise.all([
+    // Construct a where clause without the role filter
+    const querySinRol = { ...query };
+    delete querySinRol.rol;
+    const whereSinRol = buildUsuariosWhere(querySinRol, securityFilter);
+
+    const [total, totalAbsoluto, resumenRoles, usuarios] = await Promise.all([
       prisma.usuario.count({ where }),
+      prisma.usuario.count({ where: whereSinRol }),
       prisma.usuario.groupBy({
         by:     ["rol"],
         _count: { id: true },
-        where:  { ...securityFilter, estado: where.estado },
+        where:  whereSinRol,
       }),
       prisma.usuario.findMany({
         where,
@@ -56,6 +62,7 @@ export const listarUsuarios = async (req: Request, res: Response) => {
     return res.json({
       status: "success",
       pagination: { total, page, limit, totalPages: Math.ceil(total / limit) },
+      totalAbsoluto,
       resumenRoles: resumen,
       data: usuarios,
     });

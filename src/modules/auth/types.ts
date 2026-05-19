@@ -1,4 +1,4 @@
-import { Rol, Linea, Area } from "@prisma/client";
+import { Rol, Linea, Area, Departamento } from "@prisma/client";
 
 export interface TokenPayload {
   id: number;
@@ -7,7 +7,7 @@ export interface TokenPayload {
   rol: Rol;
   nombre: string;
   linea: Linea | null;
-  area: Area;
+  departamento: Departamento | null;
 }
 
 export interface LoginResponse {

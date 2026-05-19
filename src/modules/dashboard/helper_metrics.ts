@@ -22,7 +22,7 @@ type TareaConMinuta = Pick<
   | "fechaVencimiento"
   | "minutaId"
 > & {
-  minuta: { id: number; titulo: string; fecha: Date } | null;
+  minuta: { id: number; titulo: string; fechaProgramada: Date; fechaRealizada: Date | null } | null;
 };
 
 export type TareaEvaluada = TareaConMinuta & {
@@ -319,9 +319,8 @@ const agruparPorMinuta = (
     .map(([minutaId, items]) => {
       const muestra = items[0] ?? null;
       const minutaTitulo = muestra?.minuta?.titulo ?? "SIN_MINUTA";
-      const minutaFecha = muestra?.minuta?.fecha
-        ? toIsoDateTime(muestra.minuta.fecha)
-        : null;
+      const mFecha = muestra?.minuta ? (muestra.minuta.fechaRealizada || muestra.minuta.fechaProgramada) : null;
+      const minutaFecha = mFecha ? toIsoDateTime(mFecha) : null;
 
       return {
         minutaId,
@@ -395,7 +394,8 @@ export const construirDashboardMetricas = async (
           select: {
             id: true,
             titulo: true,
-            fecha: true,
+            fechaProgramada: true,
+            fechaRealizada: true,
           },
         },
       },

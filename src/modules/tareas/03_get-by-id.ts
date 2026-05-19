@@ -47,7 +47,8 @@ export const getTareaById = async (
             id: true,
             titulo: true,
             estado: true,
-            fecha: true,
+            fechaProgramada: true,
+            fechaRealizada: true,
           },
         },
 
