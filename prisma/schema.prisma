@@ -141,6 +141,7 @@ model Minuta {
   id           Int          @id @default(autoincrement())
   titulo       String       @db.VarChar(200)
   lineaDefault String?
+  departamento Departamento @default(DISENO)
   estado       EstadoMinuta @default(PROGRAMADA)
 
   fechaProgramada DateTime

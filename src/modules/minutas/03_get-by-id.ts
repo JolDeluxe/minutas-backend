@@ -199,7 +199,7 @@ export const getMinutaById = async (req: Request, res: Response) => {
 
     // Calcular navegación ejecutiva para saber si esta minuta es la Junta Actual o Anterior
     const ultimasDosJuntas = await prisma.minuta.findMany({
-      where: { estado: { in: ["ACTIVA", "EN_REVISION", "CERRADA"] } },
+      where: { estado: { in: ["ACTIVA", "CERRADA"] } },
       orderBy: { fechaRealizada: "desc" },
       take: 2,
       select: { id: true },

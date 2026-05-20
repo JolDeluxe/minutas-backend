@@ -51,16 +51,30 @@ export const listarMinutas = async (req: Request, res: Response) => {
       }),
     ]);
 
-    // ─── Navegación ejecutiva: Última junta y Anterior (GLOBAL, sin filtros) ───
-    const ultimasDosJuntas = await prisma.minuta.findMany({
-      where: { estado: { in: ["ACTIVA", "EN_REVISION", "CERRADA"] } },
+    // ─── Navegación ejecutiva: Última junta y Anterior (POR DEPARTAMENTO) ───
+    const ultimasDiseno = await prisma.minuta.findMany({
+      where: { estado: { in: ["ACTIVA", "CERRADA"] }, departamento: "DISENO" },
       orderBy: { fechaRealizada: "desc" },
       take: 2,
       select: { id: true },
     });
 
-    const ultimaJuntaId = ultimasDosJuntas[0]?.id ?? null;
-    const juntaAnteriorId = ultimasDosJuntas[1]?.id ?? null;
+    const ultimasMarketing = await prisma.minuta.findMany({
+      where: { estado: { in: ["ACTIVA", "CERRADA"] }, departamento: "MARKETING" },
+      orderBy: { fechaRealizada: "desc" },
+      take: 2,
+      select: { id: true },
+    });
+
+    const ultimaJuntaId = {
+      DISENO: ultimasDiseno[0]?.id ?? null,
+      MARKETING: ultimasMarketing[0]?.id ?? null,
+    };
+    
+    const juntaAnteriorId = {
+      DISENO: ultimasDiseno[1]?.id ?? null,
+      MARKETING: ultimasMarketing[1]?.id ?? null,
+    };
 
     // Enriquecer cada minuta con resumen operativo para las cards ejecutivas
     const now = new Date();
@@ -96,8 +110,9 @@ export const listarMinutas = async (req: Request, res: Response) => {
 
       return {
         ...minutaSinTareas,
-        isJuntaActual: m.id === ultimaJuntaId,
-        isJuntaAnterior: m.id === juntaAnteriorId,
+        departamento: m.departamento, // include for frontend logic
+        isJuntaActual: m.departamento === 'DISENO' ? m.id === ultimaJuntaId.DISENO : m.id === ultimaJuntaId.MARKETING,
+        isJuntaAnterior: m.departamento === 'DISENO' ? m.id === juntaAnteriorId.DISENO : m.id === juntaAnteriorId.MARKETING,
         resumenOperativo: {
           totalEntradas,
           completadas,

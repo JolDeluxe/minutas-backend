@@ -6,9 +6,15 @@ const pre = (val: unknown): unknown =>
   val === "" || val === "null" || val === "undefined" ? undefined : val;
 
 const parseCsv = (val: unknown): unknown => {
-  if (typeof val === "string" && val.trim() !== "")
-    return val.split(",").map((v) => v.trim()).filter(Boolean);
-  if (Array.isArray(val)) return val;
+  if (typeof val === "string" && val.trim() !== "") {
+    const list = val.split(",").map((v) => v.trim()).filter(Boolean);
+    const filtered = list.filter((v) => v !== "TODAS" && v !== "");
+    return filtered.length > 0 ? filtered : undefined;
+  }
+  if (Array.isArray(val)) {
+    const filtered = val.filter((v) => v !== "TODAS" && v !== "");
+    return filtered.length > 0 ? filtered : undefined;
+  }
   return undefined;
 };
 
@@ -22,6 +28,7 @@ export const createMinutaSchema = z.object({
     lineaDefault: z.string().optional(),
     fechaProgramada: z.string().datetime({ message: "Fecha programada inválida" }),
     iniciarInmediatamente: z.boolean().optional().default(false),
+    departamento: z.enum(["DISENO", "MARKETING"]).optional(),
   }),
 });
 
@@ -33,6 +40,7 @@ export const listMinutasSchema = z.object({
     // Filtros multi-valor vía CSV
     estado:       z.preprocess(parseCsv, z.array(z.enum(estadoValues)).optional()),
     lineaDefault: z.preprocess(parseCsv, z.array(z.string()).optional()),
+    departamentoGlobal: z.enum(["TODAS", "DISEÑO", "MARKETING"]).optional(),
 
     // Filtro por creador
     creadoPorId: z.preprocess(pre, z.coerce.number().int().positive().optional()),

@@ -35,7 +35,7 @@ export const iniciarMinuta = async (req: Request, res: Response) => {
     const anterior = await prisma.minuta.findFirst({
       where: {
         lineaDefault: minuta.lineaDefault,
-        estado: { in: ["CERRADA", "EN_REVISION"] }
+        estado: "CERRADA"
       },
       orderBy: {
         fechaRealizada: "desc"

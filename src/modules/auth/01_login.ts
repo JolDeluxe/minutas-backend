@@ -76,6 +76,8 @@ export const login = async (req: Request, res: Response) => {
         username: usuario.username,
         rol: usuario.rol,
         email: usuario.email || undefined,
+        departamento: usuario.departamento,
+        linea: usuario.linea,
         mustChangePassword: usuario.mustChangePassword,
       },
     });

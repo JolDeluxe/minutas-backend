@@ -176,7 +176,7 @@ export const listTareas = async (
 
     // Consultar últimas dos juntas para enriquecer la relación de minuta
     const ultimasDosJuntas = await prisma.minuta.findMany({
-      where: { estado: { in: ["ACTIVA", "EN_REVISION", "CERRADA"] } },
+      where: { estado: { in: ["ACTIVA", "CERRADA"] } },
       orderBy: { fechaRealizada: "desc" },
       take: 2,
       select: { id: true },

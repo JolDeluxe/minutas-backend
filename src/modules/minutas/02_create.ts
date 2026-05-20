@@ -7,11 +7,12 @@ import type { CreateMinutaInput } from "./zod";
 export const crearMinuta = async (req: Request, res: Response) => {
   try {
     const usuarioId = req.user!.id;
-    const { titulo, lineaDefault, fechaProgramada, iniciarInmediatamente } = req.body as CreateMinutaInput;
+    const { titulo, lineaDefault, fechaProgramada, iniciarInmediatamente, departamento } = req.body as CreateMinutaInput & { departamento?: string };
 
     const data: any = {
       titulo,
-      lineaDefault: lineaDefault as string,
+      lineaDefault: lineaDefault ? (lineaDefault as string) : null,
+      departamento: departamento || "DISENO",
       creadoPorId:  usuarioId,
       fechaProgramada: new Date(fechaProgramada),
     };
@@ -24,7 +25,7 @@ export const crearMinuta = async (req: Request, res: Response) => {
       const anterior = await prisma.minuta.findFirst({
         where: {
           lineaDefault: lineaDefault as string,
-          estado: { in: ["CERRADA", "EN_REVISION"] }
+          estado: "CERRADA"
         },
         orderBy: {
           fechaRealizada: "desc"

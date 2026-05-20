@@ -101,9 +101,11 @@ export const buildMinutasWhere = (
 
   // Aislamiento por departamento si no es ADMIN
   if (usuario && usuario.rol !== Rol.ADMIN && usuario.departamento) {
-    where.creadoPor = {
-      departamento: usuario.departamento
-    };
+    where.departamento = usuario.departamento;
+  } else if (usuario && usuario.rol === Rol.ADMIN && query.departamentoGlobal && query.departamentoGlobal !== "TODAS") {
+    // Si es admin y seleccionó un departamento específico
+    const mappedDept = query.departamentoGlobal === "DISEÑO" ? Departamento.DISENO : Departamento.MARKETING;
+    where.departamento = mappedDept;
   }
 
   // ─────────────────────────────
@@ -121,8 +123,23 @@ export const buildMinutasWhere = (
   // ─────────────────────────────
 
   if (query.estado?.length) {
+    const estadosFiltrados: any[] = (query.estado as any[]).filter(
+      (e) => e !== "CANCELADA" && e !== "EN_REVISION"
+    );
+    
+    // Si se filtra por ACTIVA, también incluimos PROGRAMADA automáticamente
+    if (estadosFiltrados.includes("ACTIVA")) {
+      if (!estadosFiltrados.includes("PROGRAMADA")) {
+        estadosFiltrados.push("PROGRAMADA");
+      }
+    }
+
     where.estado = {
-      in: query.estado as EstadoMinuta[],
+      in: estadosFiltrados,
+    };
+  } else {
+    where.estado = {
+      notIn: ["CANCELADA", "EN_REVISION"] as EstadoMinuta[],
     };
   }
 
@@ -142,18 +159,19 @@ export const buildMinutasWhere = (
   }
 
   // ─────────────────────────────
-  // PERIODO RÁPIDO (Vista Ejecutiva)
+  // PERIODO RÁPIDO Y RANGO DE FECHAS (Vista Ejecutiva)
   // ─────────────────────────────
 
-  let fechaRango: { gte?: Date; lte?: Date } | undefined;
+  let gteLimit: Date | undefined;
+  let lteLimit: Date | undefined;
 
+  // 1. Calcular límites por período, año o mes
   if (query.periodo && query.periodo !== "all") {
     const now = new Date();
 
     if (query.periodo === "today") {
-      const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
-      fechaRango = { gte: start, lte: end };
+      gteLimit = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      lteLimit = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
     } else if (query.periodo === "week") {
       const start = new Date(now);
       start.setDate(now.getDate() - now.getDay());
@@ -161,39 +179,49 @@ export const buildMinutasWhere = (
       const end = new Date(start);
       end.setDate(start.getDate() + 6);
       end.setHours(23, 59, 59, 999);
-      fechaRango = { gte: start, lte: end };
+      gteLimit = start;
+      lteLimit = end;
     } else if (query.periodo === "month") {
       const y = query.year ?? now.getFullYear();
       const m = query.month ? query.month - 1 : now.getMonth();
-      const start = new Date(y, m, 1);
-      const end = new Date(y, m + 1, 0, 23, 59, 59, 999);
-      fechaRango = { gte: start, lte: end };
+      gteLimit = new Date(y, m, 1);
+      lteLimit = new Date(y, m + 1, 0, 23, 59, 59, 999);
     } else if (query.periodo === "year") {
       const y = query.year ?? now.getFullYear();
-      const start = new Date(y, 0, 1);
-      const end = new Date(y, 11, 31, 23, 59, 59, 999);
-      fechaRango = { gte: start, lte: end };
+      gteLimit = new Date(y, 0, 1);
+      lteLimit = new Date(y, 11, 31, 23, 59, 59, 999);
     }
   } else if (query.year || query.month) {
     const now = new Date();
     const y = query.year ?? now.getFullYear();
     if (query.month) {
-      const start = new Date(y, query.month - 1, 1);
-      const end = new Date(y, query.month, 0, 23, 59, 59, 999);
-      fechaRango = { gte: start, lte: end };
+      gteLimit = new Date(y, query.month - 1, 1);
+      lteLimit = new Date(y, query.month, 0, 23, 59, 59, 999);
     } else {
-      const start = new Date(y, 0, 1);
-      const end = new Date(y, 11, 31, 23, 59, 59, 999);
-      fechaRango = { gte: start, lte: end };
+      gteLimit = new Date(y, 0, 1);
+      lteLimit = new Date(y, 11, 31, 23, 59, 59, 999);
     }
-  } else if (query.fechaDesde || query.fechaHasta) {
+  }
+
+  // 2. Intersección con rango personalizado (fechaDesde / fechaHasta)
+  if (query.fechaDesde) {
+    const fd = new Date(query.fechaDesde);
+    if (!gteLimit || fd > gteLimit) {
+      gteLimit = fd;
+    }
+  }
+  if (query.fechaHasta) {
+    const fh = new Date(query.fechaHasta);
+    if (!lteLimit || fh < lteLimit) {
+      lteLimit = fh;
+    }
+  }
+
+  let fechaRango: { gte?: Date; lte?: Date } | undefined;
+  if (gteLimit || lteLimit) {
     fechaRango = {};
-    if (query.fechaDesde) {
-      fechaRango.gte = new Date(query.fechaDesde);
-    }
-    if (query.fechaHasta) {
-      fechaRango.lte = new Date(query.fechaHasta);
-    }
+    if (gteLimit) fechaRango.gte = gteLimit;
+    if (lteLimit) fechaRango.lte = lteLimit;
   }
 
   if (fechaRango) {

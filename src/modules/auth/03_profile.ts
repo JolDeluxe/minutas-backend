@@ -19,6 +19,8 @@ export const getProfile = async (req: Request, res: Response) => {
         email: true,
         rol: true,
         imagen: true,
+        departamento: true,
+        linea: true,
         createdAt: true,
       },
     });
