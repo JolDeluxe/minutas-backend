@@ -1,6 +1,4 @@
 import {
-  EstadoConceptual,
-  EstadoOperativo,
   EstadoMinuta,
   Prisma,
   Rol,
@@ -10,81 +8,6 @@ import {
 import { prisma } from "../../db";
 
 import type { ListMinutasQuery } from "./zod";
-
-export const obtenerResumenMinuta = async (
-  minutaId: number
-): Promise<{
-  conceptual: Record<string, number>;
-  operativo: Record<string, number>;
-  totalEntradas: number;
-}> => {
-  const [
-    conceptos,
-    operativos,
-    totalEntradas,
-  ] = await Promise.all([
-    prisma.tarea.groupBy({
-      by: ["estadoConceptual"],
-
-      where: {
-        minutaId,
-      },
-
-      _count: {
-        id: true,
-      },
-    }),
-
-    prisma.tarea.groupBy({
-      by: ["estadoOperativo"],
-
-      where: {
-        minutaId,
-        estadoOperativo: {
-          not: null,
-        },
-      },
-
-      _count: {
-        id: true,
-      },
-    }),
-
-    prisma.tarea.count({
-      where: {
-        minutaId,
-      },
-    }),
-  ]);
-
-  const conceptual =
-    conceptos.reduce(
-      (acc, curr) => ({
-        ...acc,
-        [curr.estadoConceptual]:
-          curr._count.id,
-      }),
-
-      {} as Record<string, number>
-    );
-
-  const operativo =
-    operativos.reduce(
-      (acc, curr) => ({
-        ...acc,
-        [curr.estadoOperativo as EstadoOperativo]:
-          curr._count.id,
-      }),
-
-      {} as Record<string, number>
-    );
-
-  return {
-    conceptual,
-    operativo,
-    totalEntradas,
-  };
-};
 
 /**
  * Construye dinámicamente la cláusula `where`
@@ -124,7 +47,7 @@ export const buildMinutasWhere = (
 
   if (query.estado?.length) {
     const estadosFiltrados: any[] = (query.estado as any[]).filter(
-      (e) => e !== "CANCELADA" && e !== "EN_REVISION"
+      (e) => e !== "CANCELADA"
     );
     
     // Si se filtra por ACTIVA, también incluimos PROGRAMADA automáticamente
@@ -139,7 +62,7 @@ export const buildMinutasWhere = (
     };
   } else {
     where.estado = {
-      notIn: ["CANCELADA", "EN_REVISION"] as EstadoMinuta[],
+      notIn: ["CANCELADA"] as EstadoMinuta[],
     };
   }
 

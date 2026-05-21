@@ -1,75 +1,23 @@
 import cron from "node-cron";
-
 import { prisma } from "../../db";
+import { EstadoTarea } from "@prisma/client";
+import { evaluarEstadoMinuta } from "./helpers";
 
-import {
-  EstadoConceptual,
-  EstadoOperativo,
-  EstadoTarea,
-} from "@prisma/client";
-
-import {
-  evaluarEstadoMinuta,
-} from "./helpers";
-
-cron.schedule(
-  "0 2 * * *",
-  async () => {
+cron.schedule("0 2 * * *", async () => {
     try {
-      console.log(
-        "CRON tareas iniciado..."
-      );
-
+      console.log("CRON tareas iniciado...");
       const ahora = new Date();
+      const hace10Dias = new Date();
+      hace10Dias.setDate(hace10Dias.getDate() - 10);
 
-      const hace10Dias =
-        new Date();
-
-      hace10Dias.setDate(
-        hace10Dias.getDate() - 10
-      );
-
-      const tareasOlvidadas =
-        await prisma.tarea.findMany({
+      const tareasOlvidadas = await prisma.tarea.findMany({
           where: {
-            estado: EstadoTarea.COMPLETADO,
-
-            estadoConceptual: {
-              not:
-                EstadoConceptual.CERRADO,
-            },
-
-            estadoOperativo:
-              EstadoOperativo.COMPLETADO,
-
-            completadoAt: {
-              lte: hace10Dias,
-            },
-
-            isExternalArea: false,
+            estado: EstadoTarea.EN_REVISION,
+            completadoAt: { lte: hace10Dias },
           },
-        });
+      });
 
-      const tareasExternas =
-        await prisma.tarea.findMany({
-          where: {
-            isExternalArea: true,
-
-            estado: {
-              not:
-                EstadoTarea.CERRADO,
-            },
-
-            fechaVencimiento: {
-              lte: ahora,
-            },
-          },
-        });
-
-      const tareasACerrar = [
-        ...tareasOlvidadas,
-        ...tareasExternas,
-      ];
+      const tareasACerrar = [...tareasOlvidadas];
 
       let cerradas = 0;
       let errores = 0;
@@ -77,38 +25,22 @@ cron.schedule(
       for (const tarea of tareasACerrar) {
         try {
           await prisma.tarea.update({
-            where: {
-              id: tarea.id,
-            },
-
+            where: { id: tarea.id },
             data: {
-              estado:
-                EstadoTarea.CERRADO,
-
-              estadoConceptual:
-                EstadoConceptual.CERRADO,
-
+              estado: EstadoTarea.CERRADA,
               cerradoAt: ahora,
             },
           });
-
           cerradas++;
-
           if (tarea.minutaId) {
-            await evaluarEstadoMinuta(
-              tarea.minutaId
-            );
+            await evaluarEstadoMinuta(tarea.minutaId);
           }
         } catch (err) {
           errores++;
-          console.error(
-            `CRON: Error cerrando tarea ${tarea.id}:`,
-            err
-          );
+          console.error(`CRON: Error cerrando tarea ${tarea.id}:`, err);
         }
       }
 
-      // Registrar resultado en bitácora del sistema
       if (tareasACerrar.length > 0) {
         await prisma.bitacora.create({
           data: {
@@ -119,16 +51,9 @@ cron.schedule(
         });
       }
 
-      console.log(
-        `CRON finalizado. Cerradas: ${cerradas}, Errores: ${errores}`
-      );
+      console.log(`CRON finalizado. Cerradas: ${cerradas}, Errores: ${errores}`);
     } catch (error) {
-      console.error(
-        "CRON: Error crítico en cierre automático:",
-        error
-      );
-
-      // Intentar registrar el error crítico en bitácora
+      console.error("CRON: Error crítico en cierre automático:", error);
       try {
         await prisma.bitacora.create({
           data: {
@@ -139,5 +64,4 @@ cron.schedule(
         });
       } catch (_) {}
     }
-  }
-);
+});

@@ -5,6 +5,7 @@ import { upload } from "../middlewares/upload";
 import {
   createTareaSchema,
   updateTareaSchema,
+  organizarTareaSchema,
   changeEstadoSchema,
   tareaIdSchema,
   imagenIdSchema,
@@ -17,6 +18,7 @@ import { listTareas }        from "../modules/tareas/01_list";
 import { crearTarea }        from "../modules/tareas/02_create";
 import { getTareaById }      from "../modules/tareas/03_get-by-id";
 import { updateTarea }       from "../modules/tareas/04_update";
+import { organizarTarea }    from "../modules/tareas/04_organizar";
 import { changeEstadoTarea } from "../modules/tareas/05_change-status";
 import { deleteTarea }       from "../modules/tareas/06_delete";
 import { addImagenTarea, deleteImagenTarea } from "../modules/tareas/07_imagenes";
@@ -41,10 +43,13 @@ router.get("/:id", validate(tareaIdSchema), getTareaById);
 // Generar PDF de evidencia en Cloudinary
 router.get("/:id/pdf", validate(tareaIdSchema), generarPdfTarea);
 
-// Actualización de campos de dominio
+// Actualización de campos de dominio (textos básicos)
 router.put("/:id", validate(updateTareaSchema), updateTarea);
 
-// Cambio de estado (Workflow)
+// Organización post-junta (Clasificación, estado, tipo, alcance)
+router.patch("/:id/organizar", validate(organizarTareaSchema), organizarTarea);
+
+// Cambio de estado (Workflow lineal)
 router.patch("/:id/estado", validate(changeEstadoSchema), changeEstadoTarea);
 
 /**

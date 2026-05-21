@@ -19,29 +19,18 @@ export const iniciarTareasProgramadas = () => {
 
       const tareasOlidadas = await prisma.tarea.findMany({
         where: {
-          estado: EstadoTarea.COMPLETADO,
-          isExternalArea: false,
-          completadoAt: { lte: hace10Dias },
-          fechaVencimiento: { lte: ahora } // Ya pasó la fecha límite
+          estado: EstadoTarea.EN_REVISION,
+          completadoAt: { lte: hace10Dias }
         }
       });
 
-      // 2. Cerrar Tareas Externas por fecha de vencimiento
-      const tareasExternasVencidas = await prisma.tarea.findMany({
-        where: {
-          isExternalArea: true,
-          estado: { not: EstadoTarea.CERRADO },
-          fechaVencimiento: { lte: ahora }
-        }
-      });
-
-      const tareasACerrar = [...tareasOlidadas, ...tareasExternasVencidas];
+      const tareasACerrar = [...tareasOlidadas];
 
       if (tareasACerrar.length > 0) {
         for (const tarea of tareasACerrar) {
           await prisma.tarea.update({
             where: { id: tarea.id },
-            data: { estado: EstadoTarea.CERRADO, cerradoAt: ahora }
+            data: { estado: EstadoTarea.CERRADA, cerradoAt: ahora }
           });
 
           // Revisar si esto provoca que su minuta se cierre automáticamente

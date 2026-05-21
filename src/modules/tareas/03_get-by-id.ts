@@ -38,7 +38,7 @@ export const getTareaById = async (
           select: USUARIO_SELECT_BASICO,
         },
 
-        formalizadoPor: {
+        organizadoPor: {
           select: USUARIO_SELECT_MINIMO,
         },
 

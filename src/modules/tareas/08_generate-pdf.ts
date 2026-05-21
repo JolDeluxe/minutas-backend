@@ -137,12 +137,12 @@ export const generarPdfTarea = async (
           );
 
           doc.text(
-            `Estado conceptual: ${tarea.estadoConceptual}`
+            `Tipo: ${tarea.tipo}`
           );
 
           doc.text(
-            `Estado operativo: ${
-              tarea.estadoOperativo ??
+            `Estado: ${
+              tarea.estado ??
               "No aplica"
             }`
           );

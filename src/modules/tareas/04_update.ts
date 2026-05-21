@@ -1,456 +1,127 @@
 // minutas-backend/src/modules/tareas/04_update.ts
 
 import type { Request, Response } from "express";
-
 import { prisma } from "../../db";
+import { Rol, EstadoTarea } from "@prisma/client";
+import { registrarAccion, registrarError } from "../../utils/logger";
+import { registrarCambio, normalizarFechaVencimiento } from "./helpers";
+import type { UpdateTareaInput, UpdateTareaParams } from "./zod";
 
-import {
-  Area,
-  Prioridad,
-  EstadoOperativo,
-  Rol,
-  EstadoTarea,
-} from "@prisma/client";
-
-
-import {
-  registrarAccion,
-  registrarError,
-} from "../../utils/logger";
-
-import {
-  calcularIsExternalArea,
-  calcularCapturaCompleta,
-  registrarCambio,
-  normalizarFechaVencimiento,
-} from "./helpers";
-
-import type {
-  UpdateTareaInput,
-  UpdateTareaParams,
-} from "./zod";
-
-export const updateTarea = async (
-  req: Request,
-  res: Response
-) => {
+export const updateTarea = async (req: Request, res: Response) => {
   try {
     const usuarioId = req.user!.id;
     const rolUsuario = req.user!.rol;
+    const { id } = req.params as unknown as UpdateTareaParams;
+    const datos = req.body as UpdateTareaInput;
 
-    const { id } =
-      req.params as unknown as UpdateTareaParams;
-
-    const datos =
-      req.body as UpdateTareaInput;
-
-    // ── Validación de permisos por rol ────────────────────────
-    // COORDINADOR solo puede editar descripción y campos de captura básica.
-    // Campos de Fase 2 (organización post-junta) requieren JEFE o GERENCIA.
     const camposFase2: (keyof UpdateTareaInput)[] = [
-      "area", "linea", "clasificacion", "prioridad",
-      "estadoConceptual", "estadoOperativo",
-      "fechaVencimiento", "responsables", "formalizada",
+      "tipo", "estado", "alcanceRecordatorio", "prioridad", "fechaVencimiento", "responsables"
     ];
 
     if (rolUsuario === Rol.COORDINADOR) {
-      const intentaCambiarFase2 = camposFase2.some(
-        (c) => datos[c] !== undefined
-      );
-
+      const intentaCambiarFase2 = camposFase2.some((c) => datos[c] !== undefined);
       if (intentaCambiarFase2) {
         return res.status(403).json({
-          error:
-            "No tienes permisos para modificar campos de organización post-junta",
+          error: "No tienes permisos para modificar campos de organización post-junta",
         });
       }
     }
 
-    const tareaActual =
-      await prisma.tarea.findUnique({
-        where: { id },
-
-        include: {
-          asignaciones: {
-            select: {
-              id: true,
-              usuarioId: true,
-            },
-          },
+    const tareaActual = await prisma.tarea.findUnique({
+      where: { id },
+      include: {
+        asignaciones: {
+          select: { id: true, usuarioId: true },
         },
-      });
+      },
+    });
 
     if (!tareaActual) {
-      return res.status(404).json({
-        error: "Tarea no encontrada",
-      });
+      return res.status(404).json({ error: "Tarea no encontrada" });
     }
 
-    // ── CANDADO DE INMUTABILIDAD: Tareas Cerradas no se tocan ──
-    if (tareaActual.estado === EstadoTarea.CERRADO) {
+    if (tareaActual.estado === EstadoTarea.CERRADA || tareaActual.estado === EstadoTarea.CANCELADA) {
       return res.status(400).json({
-        error: "Esta entrada ya ha sido cerrada y no puede ser modificada ni descartada",
+        error: "Esta entrada ya ha sido cerrada o cancelada y no puede ser modificada",
       });
     }
 
     const data: Record<string, any> = {};
+    const historial: { campo: string; antes: string | null; despues: string | null; }[] = [];
 
-    const historial: {
-      campo: string;
-      antes: string | null;
-      despues: string | null;
-    }[] = [];
-
-    if (
-      datos.descripcion !== undefined &&
-      datos.descripcion !== tareaActual.descripcion
-    ) {
-      historial.push({
-        campo: "descripcion",
-        antes: tareaActual.descripcion,
-        despues: datos.descripcion,
-      });
-
-      data.descripcion = datos.descripcion;
-    }
-
-    if (datos.area !== undefined) {
-      const val =
-        (datos.area ?? null) as Area | null;
-
-      if (val !== tareaActual.area) {
-        historial.push({
-          campo: "area",
-          antes: tareaActual.area,
-          despues: val,
-        });
-
-        data.area = val;
-        data.isExternalArea =
-          calcularIsExternalArea(val);
-      }
-    }
-
-    if (datos.linea !== undefined) {
-      const val =
-        (datos.linea ?? null) as string | null;
-
-      if (val !== tareaActual.linea) {
-        historial.push({
-          campo: "linea",
-          antes: tareaActual.linea,
-          despues: val,
-        });
-
-        data.linea = val;
-      }
-    }
-
-    if (datos.prioridad !== undefined) {
-      const val =
-        (datos.prioridad ?? null) as Prioridad | null;
-
-      if (val !== tareaActual.prioridad) {
-        historial.push({
-          campo: "prioridad",
-          antes: tareaActual.prioridad,
-          despues: val,
-        });
-
-        data.prioridad = val;
-      }
-    }
-
-    if (datos.clasificacion !== undefined) {
-      const val =
-        (datos.clasificacion ?? null) as string | null;
-
-      if (val !== tareaActual.clasificacion) {
-        historial.push({
-          campo: "clasificacion",
-          antes: tareaActual.clasificacion,
-          despues: val,
-        });
-
-        data.clasificacion = val;
-      }
-    }
-
-    if (datos.estadoConceptual !== undefined) {
-      if (
-        datos.estadoConceptual !==
-        tareaActual.estadoConceptual
-      ) {
-        historial.push({
-          campo: "estadoConceptual",
-          antes: tareaActual.estadoConceptual,
-          despues: datos.estadoConceptual,
-        });
-
-        data.estadoConceptual =
-          datos.estadoConceptual;
-
-        // ── KILL SWITCH: Regla de Descarte Operativo ──
-        if (datos.estadoConceptual === 'DESCARTADO') {
-          data.estado = EstadoTarea.CERRADO;
-          data.cerradoAt = new Date();
-          data.estadoOperativo = null;
-          data.fechaVencimiento = null;
-          // Nota: No se toca completadoAt para no ensuciar KPIs de ejecución real.
+    const verificarYRegistrar = (campo: keyof UpdateTareaInput, valorNuevo: any, valorActual: any) => {
+        if (valorNuevo !== undefined && valorNuevo !== valorActual) {
+            historial.push({ campo, antes: String(valorActual ?? null), despues: String(valorNuevo ?? null) });
+            data[campo] = valorNuevo;
         }
-      }
     }
 
-    if (datos.fechaSeguimiento !== undefined) {
-      const nuevaFecha =
-        datos.fechaSeguimiento
-          ? new Date(datos.fechaSeguimiento)
-          : null;
-
-      const antes =
-        tareaActual.fechaSeguimiento?.toISOString() ??
-        null;
-
-      const despues =
-        nuevaFecha?.toISOString() ?? null;
-
-      if (antes !== despues) {
-        historial.push({
-          campo: "fechaSeguimiento",
-          antes,
-          despues,
-        });
-
-        data.fechaSeguimiento = nuevaFecha;
-      }
-    }
-
-    if (datos.requiereSeguimiento !== undefined) {
-      if (
-        datos.requiereSeguimiento !==
-        tareaActual.requiereSeguimiento
-      ) {
-        historial.push({
-          campo: "requiereSeguimiento",
-          antes: String(
-            tareaActual.requiereSeguimiento
-          ),
-          despues: String(
-            datos.requiereSeguimiento
-          ),
-        });
-
-        data.requiereSeguimiento =
-          datos.requiereSeguimiento;
-      }
-    }
-
+    verificarYRegistrar("descripcion", datos.descripcion, tareaActual.descripcion);
+    verificarYRegistrar("area", datos.area, tareaActual.area);
+    verificarYRegistrar("linea", datos.linea, tareaActual.linea);
+    verificarYRegistrar("clasificacion", datos.clasificacion, tareaActual.clasificacion);
+    verificarYRegistrar("prioridad", datos.prioridad, tareaActual.prioridad);
+    verificarYRegistrar("tipo", datos.tipo, tareaActual.tipo);
+    verificarYRegistrar("estado", datos.estado, tareaActual.estado);
+    verificarYRegistrar("alcanceRecordatorio", datos.alcanceRecordatorio, tareaActual.alcanceRecordatorio);
+    
     if (datos.fechaVencimiento !== undefined) {
       const nuevaFecha = normalizarFechaVencimiento(datos.fechaVencimiento);
-
-      const antes =
-        tareaActual.fechaVencimiento?.toISOString() ??
-        null;
-
-      const despues =
-        nuevaFecha?.toISOString() ?? null;
-
+      const antes = tareaActual.fechaVencimiento?.toISOString() ?? null;
+      const despues = nuevaFecha?.toISOString() ?? null;
       if (antes !== despues) {
-        historial.push({
-          campo: "fechaVencimiento",
-          antes,
-          despues,
-        });
-
+        historial.push({ campo: "fechaVencimiento", antes, despues });
         data.fechaVencimiento = nuevaFecha;
       }
     }
 
-    // ── Asignaciones y update en transacción ─────────────────
-    let totalAsignacionesFinal =
-      tareaActual.asignaciones.length;
-
     await prisma.$transaction(async (tx) => {
+      // Manejo de responsables
       if (datos.responsables !== undefined) {
-        const idsActuales = new Set(
-          tareaActual.asignaciones.map(
-            (a) => a.usuarioId
-          )
-        );
-
-        const idsNuevos = new Set(
-          datos.responsables
-        );
-
-        const idsAgregar =
-          datos.responsables.filter(
-            (uid) => !idsActuales.has(uid)
-          );
-
-        const idsEliminar =
-          tareaActual.asignaciones
-            .filter(
-              (a) => !idsNuevos.has(a.usuarioId)
-            )
-            .map((a) => a.id);
+        const idsActuales = new Set(tareaActual.asignaciones.map((a) => a.usuarioId));
+        const idsNuevos = new Set(datos.responsables);
+        const idsAgregar = datos.responsables.filter((uid) => !idsActuales.has(uid));
+        const idsEliminar = tareaActual.asignaciones.filter((a) => !idsNuevos.has(a.usuarioId)).map((a) => a.id);
 
         if (idsEliminar.length > 0) {
-          await tx.tareaAsignacion.deleteMany({
-            where: {
-              id: {
-                in: idsEliminar,
-              },
-            },
-          });
+          await tx.tareaAsignacion.deleteMany({ where: { id: { in: idsEliminar } } });
         }
 
         if (idsAgregar.length > 0) {
           await tx.tareaAsignacion.createMany({
-            data: idsAgregar.map((uid) => ({
-              tareaId: id,
-              usuarioId: uid,
-              asignadoPorId: usuarioId,
-            })),
-
+            data: idsAgregar.map((uid) => ({ tareaId: id, usuarioId: uid, asignadoPorId: usuarioId })),
             skipDuplicates: true,
           });
         }
-
-        totalAsignacionesFinal =
-          datos.responsables.length;
       }
-
-      // ── Calcular capturaCompleta y formalizada ───────────
-      const clasificacionFinal =
-        data.clasificacion !== undefined
-          ? data.clasificacion
-          : tareaActual.clasificacion;
-
-      const fechaFinal =
-        data.fechaVencimiento !== undefined
-          ? data.fechaVencimiento
-          : tareaActual.fechaVencimiento;
-
-      const capturaCompleta =
-        calcularCapturaCompleta({
-          clasificacion: clasificacionFinal,
-          fechaVencimiento: fechaFinal,
-          totalAsignaciones: totalAsignacionesFinal,
-        });
-
-      data.capturaCompleta = capturaCompleta;
-
-      // Gestionar formalización automática
-      if (capturaCompleta && !tareaActual.formalizada) {
-        data.formalizada = true;
-        data.formalizadoAt = new Date();
-        data.formalizadoPorId = usuarioId;
-      }
-
-      // ── estadoOperativo: solo cambiar cuando hay transición real ──
-      // NO resetear a PENDIENTE si ya está EN_PROGRESO o COMPLETADO.
-      if (totalAsignacionesFinal > 0 && tareaActual.estadoOperativo === null) {
-        // Transición de "sin asignaciones" a "con asignaciones"
-        data.estadoOperativo = EstadoOperativo.PENDIENTE;
-      } else if (totalAsignacionesFinal === 0 && tareaActual.estadoOperativo !== null) {
-        // Se eliminaron todas las asignaciones
-        data.estadoOperativo = null;
-      }
-      // En cualquier otro caso: NO tocar estadoOperativo.
 
       if (Object.keys(data).length > 0) {
-        await tx.tarea.update({
-          where: { id },
-          data,
-        });
+        await tx.tarea.update({ where: { id }, data });
       }
     });
 
     if (historial.length > 0) {
       await Promise.all(
-        historial.map((h) =>
-          registrarCambio(
-            id,
-            usuarioId,
-            h.campo,
-            h.antes,
-            h.despues
-          )
-        )
+        historial.map((h) => registrarCambio(id, usuarioId, h.campo, h.antes, h.despues))
       );
     }
 
-    await registrarAccion(
-      "ACTUALIZAR_TAREA",
-      usuarioId,
-      `Entrada organizacional ${id}`
-    );
+    await registrarAccion("ACTUALIZAR_TAREA", usuarioId, `Entrada organizacional ${id}`);
 
-    const tareaActualizada =
-      await prisma.tarea.findUnique({
-        where: { id },
-
-        include: {
-          imagenes: {
-            orderBy: {
-              orden: "asc",
-            },
-          },
-
-          asignaciones: {
-            include: {
-              usuario: {
-                select: {
-                  id: true,
-                  nombre: true,
-                  username: true,
-                  imagen: true,
-                  rol: true,
-                  linea: true,
-                },
-              },
-            },
-          },
-
-          creadoPor: {
-            select: {
-              id: true,
-              nombre: true,
-              username: true,
-              imagen: true,
-              linea: true,
-            },
-          },
-
-          minuta: {
-            select: {
-              id: true,
-              titulo: true,
-              estado: true,
-            },
-          },
-
-          notas: {
-            orderBy: {
-              createdAt: "desc",
-            },
-          },
-        },
-      });
-
-    return res.json({
-      status: "success",
-      data: tareaActualizada,
+    const tareaActualizada = await prisma.tarea.findUnique({
+      where: { id },
+      include: {
+        imagenes: { orderBy: { orden: "asc" } },
+        asignaciones: { include: { usuario: { select: { id: true, nombre: true, username: true, imagen: true, rol: true, linea: true } } } },
+        creadoPor: { select: { id: true, nombre: true, username: true, imagen: true, linea: true } },
+        minuta: { select: { id: true, titulo: true, estado: true } },
+        notas: { orderBy: { createdAt: "desc" } },
+      },
     });
+
+    return res.json({ status: "success", data: tareaActualizada });
   } catch (error) {
-    await registrarError(
-      "ACTUALIZAR_TAREA",
-      req.user?.id ?? null,
-      error
-    );
-
-    return res.status(500).json({
-      error: "Error al actualizar tarea",
-    });
+    await registrarError("ACTUALIZAR_TAREA", req.user?.id ?? null, error);
+    return res.status(500).json({ error: "Error al actualizar tarea" });
   }
 };

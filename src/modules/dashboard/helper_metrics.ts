@@ -189,7 +189,7 @@ export const resolverRangoFechas = (
 export const buildDashboardWhere = (query: DashboardFiltrosQuery): Prisma.TareaWhereInput => {
   const where: Prisma.TareaWhereInput = { 
     area: Area.DISENO,
-    formalizada: true 
+    tipo: { in: ["TAREA", "RECORDATORIO"] }
   };
 
   if (query.q) where.descripcion = { contains: query.q };
@@ -203,7 +203,6 @@ export const buildDashboardWhere = (query: DashboardFiltrosQuery): Prisma.TareaW
     where.clasificacion = { not: "POLITICAS" };
   }
   if (query.prioridad?.length) where.prioridad = { in: query.prioridad as Prioridad[] };
-  if (query.capturaCompleta != null) where.capturaCompleta = query.capturaCompleta;
   if (query.responsableId != null) {
     where.asignaciones = { some: { usuarioId: query.responsableId } };
   }

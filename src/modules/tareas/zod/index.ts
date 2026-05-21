@@ -3,9 +3,8 @@ import {
   Area,
   Prioridad,
   EstadoTarea,
-  EstadoConceptual,
-  EstadoOperativo,
-  TipoAsignacion,
+  TipoEntrada,
+  AlcanceRecordatorio,
 } from "@prisma/client";
 
 // ─────────────────────────────────────────────────────────────
@@ -32,7 +31,6 @@ const parseBool = (v: unknown): unknown => {
   return v;
 };
 
-// Solución: La fecha ahora pasa por "pre" para evitar el "Invalid Date" en strings vacíos
 const isoFecha = z.preprocess(
   pre,
   z.coerce.date({ message: "Fecha inválida" }).optional()
@@ -49,12 +47,6 @@ const responsablesField = z.preprocess((val) => {
   }
   return val;
 }, z.array(z.coerce.number().int().positive()).optional());
-
-// Solución: Adaptador seguro para el estado operativo que forzaba el "CERRADO"
-const estadoOperativoSchema = z.union([
-  z.nativeEnum(EstadoOperativo),
-  z.literal("CERRADO"),
-]);
 
 // ─────────────────────────────────────────────────────────────
 // NOTAS
@@ -91,12 +83,13 @@ const singleTareaSchema = z.object({
   linea: z.preprocess(pre, z.string().optional()),
   clasificacion: z.preprocess(pre, z.string().optional()),
 
-  fechaSeguimiento: isoFecha,
-  requiereSeguimiento: z.preprocess(parseBool, z.boolean().optional()),
+  // Clasificación post-junta
+  tipo: z.preprocess(pre, z.nativeEnum(TipoEntrada).optional()),
+  estado: z.preprocess(pre, z.nativeEnum(EstadoTarea).optional()),
+  alcanceRecordatorio: z.preprocess(pre, z.nativeEnum(AlcanceRecordatorio).optional()),
 
   // Formalización
   prioridad: z.preprocess(pre, z.nativeEnum(Prioridad).optional()),
-  estadoOperativo: z.preprocess(pre, estadoOperativoSchema.optional()),
   fechaVencimiento: z.preprocess(
     pre,
     z.coerce.date({ message: "Fecha de vencimiento inválida" }).optional()
@@ -106,7 +99,6 @@ const singleTareaSchema = z.object({
   notas: z.array(notaTareaInputSchema).optional(),
 });
 
-// Solución: Corrección del parseo para evitar arrays [undefined]
 const tareasArraySchema = z.preprocess((val) => {
   if (!val) return undefined;
   if (typeof val === "string") {
@@ -139,28 +131,17 @@ export const updateTareaSchema = z.object({
     area: z.preprocess(pre, z.nativeEnum(Area).nullable().optional()),
     linea: z.preprocess(pre, z.string().nullable().optional()),
     clasificacion: z.preprocess(pre, z.string().nullable().optional()),
+    
+    tipo: z.preprocess(pre, z.nativeEnum(TipoEntrada).nullable().optional()),
+    estado: z.preprocess(pre, z.nativeEnum(EstadoTarea).nullable().optional()),
+    alcanceRecordatorio: z.preprocess(pre, z.nativeEnum(AlcanceRecordatorio).nullable().optional()),
+    
     prioridad: z.preprocess(pre, z.nativeEnum(Prioridad).nullable().optional()),
     
-    estadoConceptual: z.preprocess(
-      pre,
-      z.nativeEnum(EstadoConceptual).nullable().optional()
-    ),
-    estadoOperativo: z.preprocess(
-      pre,
-      estadoOperativoSchema.nullable().optional()
-    ),
-    
-    fechaSeguimiento: z.preprocess(
-      pre,
-      z.coerce.date({ message: "Fecha de seguimiento inválida" }).nullable().optional()
-    ),
     fechaVencimiento: z.preprocess(
       pre,
       z.coerce.date({ message: "Fecha de vencimiento inválida" }).nullable().optional()
     ),
-    
-    requiereSeguimiento: z.preprocess(parseBool, z.boolean().nullable().optional()),
-    formalizada: z.preprocess(parseBool, z.boolean().nullable().optional()),
     
     minutaId: z.preprocess(pre, z.coerce.number().int().positive().nullable().optional()),
     responsables: responsablesField,
@@ -207,9 +188,10 @@ export const listTareasSchema = z.object({
   query: z.object({
     q: z.string().optional(),
     
+    tipo: z.preprocess(parseCsv, z.array(z.nativeEnum(TipoEntrada)).optional()),
     estado: z.preprocess(parseCsv, z.array(z.nativeEnum(EstadoTarea)).optional()),
-    estadoConceptual: z.preprocess(parseCsv, z.array(z.nativeEnum(EstadoConceptual)).optional()),
-    estadoOperativo: z.preprocess(parseCsv, z.array(estadoOperativoSchema).optional()),
+    alcanceRecordatorio: z.preprocess(parseCsv, z.array(z.nativeEnum(AlcanceRecordatorio)).optional()),
+    
     area: z.preprocess(parseCsv, z.array(z.nativeEnum(Area)).optional()),
     linea: z.preprocess(parseCsv, z.array(z.string()).optional()),
     clasificacion: z.preprocess(parseCsv, z.array(z.string()).optional()),
@@ -218,11 +200,9 @@ export const listTareasSchema = z.object({
     minutaId: z.preprocess(pre, z.coerce.number().int().positive().optional()),
     creadoPorId: z.preprocess(pre, z.coerce.number().int().positive().optional()),
     responsableId: z.preprocess(pre, z.coerce.number().int().positive().optional()),
+    organizadoPorId: z.preprocess(pre, z.coerce.number().int().positive().optional()),
     
-    requiereSeguimiento: z.preprocess(parseBool, z.boolean().optional()),
-    formalizada: z.preprocess(parseBool, z.boolean().optional()),
     isExternalArea: z.preprocess(parseBool, z.boolean().optional()),
-    capturaCompleta: z.preprocess(parseBool, z.boolean().optional()),
     atrasadas: z.preprocess(parseBool, z.boolean().optional()),
     todo: z.preprocess(parseBool, z.boolean().optional()),
     
@@ -234,8 +214,6 @@ export const listTareasSchema = z.object({
     vencimientoHasta: isoFecha,
     completadoDesde: isoFecha,
     completadoHasta: isoFecha,
-    seguimientoDesde: isoFecha,
-    seguimientoHasta: isoFecha,
     
     page: z.coerce.number().min(1).default(1),
     limit: z.coerce.number().min(1).max(100).default(20),
@@ -254,12 +232,32 @@ export const listTareasSchema = z.object({
       z.object({
         createdAt: z.enum(["asc", "desc"]).optional(),
         fechaVencimiento: z.enum(["asc", "desc"]).optional(),
-        fechaSeguimiento: z.enum(["asc", "desc"]).optional(),
         completadoAt: z.enum(["asc", "desc"]).optional(),
         prioridad: z.enum(["asc", "desc"]).optional(),
         estado: z.enum(["asc", "desc"]).optional(),
       }).strict()
     ).default([{ createdAt: "desc" }])),
+  }),
+});
+
+// ─────────────────────────────────────────────────────────────
+// ORGANIZAR
+// ─────────────────────────────────────────────────────────────
+
+export const organizarTareaSchema = z.object({
+  params: z.object({
+    id: z.coerce.number().int().positive(),
+  }),
+  body: z.object({
+    tipo: z.nativeEnum(TipoEntrada),
+    estado: z.nativeEnum(EstadoTarea).optional(),
+    alcanceRecordatorio: z.nativeEnum(AlcanceRecordatorio).optional(),
+    prioridad: z.nativeEnum(Prioridad).optional(),
+    fechaVencimiento: z.preprocess(
+      pre,
+      z.coerce.date({ message: "Fecha de vencimiento inválida" }).optional()
+    ),
+    responsables: responsablesField,
   }),
 });
 
@@ -278,3 +276,5 @@ export type TareaIdParams = z.infer<typeof tareaIdSchema>["params"];
 export type ImagenIdParams = z.infer<typeof imagenIdSchema>["params"];
 export type ListTareasQuery = z.infer<typeof listTareasSchema>["query"];
 export type DeleteTareaParams = z.infer<typeof deleteTareaSchema>["params"];
+export type OrganizarTareaParams = z.infer<typeof organizarTareaSchema>["params"];
+export type OrganizarTareaInput = z.infer<typeof organizarTareaSchema>["body"];

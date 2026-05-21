@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 import { prisma } from "../../db";
-import { EstadoConceptual, EstadoOperativo } from "@prisma/client";
+import { TipoEntrada, EstadoTarea } from "@prisma/client";
 import { registrarError } from "../../utils/logger";
 import { USUARIO_SELECT_BASICO } from "../shared-selects";
 import type { MinutaIdParams } from "./zod";
@@ -15,7 +15,6 @@ export const getMinutaById = async (req: Request, res: Response) => {
       include: {
         creadoPor: { select: USUARIO_SELECT_BASICO },
         cerradoPor: { select: { id: true, nombre: true, username: true } },
-        // POST-ITS de la junta
         notasGenerales: { orderBy: { createdAt: "desc" } },
         tareas: {
           where: {
@@ -52,21 +51,16 @@ export const getMinutaById = async (req: Request, res: Response) => {
       return res.status(403).json({ error: "No tienes permiso para acceder a esta minuta." });
     }
 
-    // Calcular resumen inline desde las tareas ya cargadas
-    // (evita las 3 queries adicionales de obtenerResumenMinuta)
-    const conceptual: Record<string, number> = {};
-    const operativo: Record<string, number> = {};
+    const porTipo: Record<string, number> = {};
+    const porEstado: Record<string, number> = {};
     const porClasificacion: Record<string, number> = {};
     const porPrioridad: Record<string, number> = {};
     let atrasadas = 0;
     const now = new Date();
 
-    // Para el resumen usamos TODAS las tareas (no filtradas por rol)
-    // porque el resumen debe reflejar el estado real de la minuta.
     let totalEntradas = minuta.tareas.length;
 
     if (usuario.rol === "COORDINADOR") {
-      // Si es coordinador, necesitamos los conteos reales (no filtrados)
       const whereBase: any = { minutaId: id };
       if (usuario.departamento) {
         whereBase.departamento = usuario.departamento;
@@ -75,15 +69,15 @@ export const getMinutaById = async (req: Request, res: Response) => {
         whereBase.linea = usuario.linea;
       }
 
-      const [conceptos, operativos, total, clasificaciones, prioridades, countAtrasadas] = await Promise.all([
+      const [tipos, estados, total, clasificaciones, prioridades, countAtrasadas] = await Promise.all([
         prisma.tarea.groupBy({
-          by: ["estadoConceptual"],
+          by: ["tipo"],
           where: whereBase,
           _count: { id: true },
         }),
         prisma.tarea.groupBy({
-          by: ["estadoOperativo"],
-          where: { ...whereBase, estadoOperativo: { not: null } },
+          by: ["estado"],
+          where: { ...whereBase, estado: { not: null } },
           _count: { id: true },
         }),
         prisma.tarea.count({ where: whereBase }),
@@ -101,16 +95,16 @@ export const getMinutaById = async (req: Request, res: Response) => {
           where: {
             ...whereBase,
             fechaVencimiento: { lt: now },
-            estado: { notIn: ["COMPLETADO", "CERRADO"] },
+            estado: { notIn: [EstadoTarea.CERRADA, EstadoTarea.CANCELADA] },
           },
         }),
       ]);
 
-      for (const c of conceptos) {
-        conceptual[c.estadoConceptual] = c._count.id;
+      for (const t of tipos) {
+        porTipo[t.tipo] = t._count.id;
       }
-      for (const o of operativos) {
-        operativo[o.estadoOperativo as string] = o._count.id;
+      for (const e of estados) {
+        if (e.estado) porEstado[e.estado] = e._count.id;
       }
       for (const cl of clasificaciones) {
         if (cl.clasificacion) porClasificacion[cl.clasificacion] = cl._count.id;
@@ -121,11 +115,10 @@ export const getMinutaById = async (req: Request, res: Response) => {
       totalEntradas = total;
       atrasadas = countAtrasadas;
     } else {
-      // Para JEFE/GERENCIA, calcular desde las tareas ya cargadas
       for (const t of minuta.tareas) {
-        conceptual[t.estadoConceptual] = (conceptual[t.estadoConceptual] || 0) + 1;
-        if (t.estadoOperativo) {
-          operativo[t.estadoOperativo] = (operativo[t.estadoOperativo] || 0) + 1;
+        porTipo[t.tipo] = (porTipo[t.tipo] || 0) + 1;
+        if (t.estado) {
+          porEstado[t.estado] = (porEstado[t.estado] || 0) + 1;
         }
         if (t.clasificacion) {
           porClasificacion[t.clasificacion] = (porClasificacion[t.clasificacion] || 0) + 1;
@@ -136,19 +129,20 @@ export const getMinutaById = async (req: Request, res: Response) => {
         if (
           t.fechaVencimiento &&
           new Date(t.fechaVencimiento) < now &&
-          t.estado !== "COMPLETADO" &&
-          t.estado !== "CERRADO"
+          t.estado !== EstadoTarea.CERRADA &&
+          t.estado !== EstadoTarea.CANCELADA
         ) {
           atrasadas++;
         }
       }
     }
 
-    const resumen = { conceptual, operativo, totalEntradas, atrasadas, porClasificacion, porPrioridad };
+    // Adaptar para retrocompatibilidad rápida con frontend mientras actualizan gráficas si es necesario
+    const resumen = { porTipo, porEstado, conceptual: porTipo, operativo: porEstado, totalEntradas, atrasadas, porClasificacion, porPrioridad };
 
     let totalValidas = 0;
     if (usuario.rol === "COORDINADOR") {
-      const whereBaseValidas: any = { minutaId: id, estadoConceptual: { not: "DESCARTADO" } };
+      const whereBaseValidas: any = { minutaId: id, tipo: { not: TipoEntrada.DESCARTADA } };
       if (usuario.departamento) {
         whereBaseValidas.departamento = usuario.departamento;
       }
@@ -161,7 +155,7 @@ export const getMinutaById = async (req: Request, res: Response) => {
       totalValidas = countValidas;
     } else {
       for (const t of minuta.tareas) {
-        if (t.estadoConceptual !== "DESCARTADO") {
+        if (t.tipo !== TipoEntrada.DESCARTADA) {
           totalValidas++;
         }
       }
@@ -173,8 +167,8 @@ export const getMinutaById = async (req: Request, res: Response) => {
     if (minuta.minutaAnteriorId) {
       const whereContexto: any = {
         minutaId: minuta.minutaAnteriorId,
-        estado: { in: ["PENDIENTE", "EN_PROGRESO"] },
-        estadoConceptual: { not: "DESCARTADO" }
+        estado: { in: [EstadoTarea.PENDIENTE, EstadoTarea.EN_REVISION] },
+        tipo: { not: TipoEntrada.DESCARTADA }
       };
       if (usuario.rol !== "ADMIN" && usuario.departamento) {
         whereContexto.departamento = usuario.departamento;
@@ -189,7 +183,7 @@ export const getMinutaById = async (req: Request, res: Response) => {
           id: true,
           descripcion: true,
           estado: true,
-          estadoOperativo: true,
+          tipo: true,
           asignaciones: {
             include: { usuario: { select: USUARIO_SELECT_BASICO } }
           }
@@ -197,7 +191,6 @@ export const getMinutaById = async (req: Request, res: Response) => {
       });
     }
 
-    // Calcular navegación ejecutiva para saber si esta minuta es la Junta Actual o Anterior
     const ultimasDosJuntas = await prisma.minuta.findMany({
       where: { estado: { in: ["ACTIVA", "CERRADA"] } },
       orderBy: { fechaRealizada: "desc" },

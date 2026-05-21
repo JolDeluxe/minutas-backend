@@ -13,7 +13,7 @@ export const cancelarMinuta = async (req: Request, res: Response) => {
       include: {
         creadoPor: { select: { departamento: true } },
         tareas: {
-          select: { estadoConceptual: true }
+          select: { tipo: true }
         }
       }
     });
@@ -31,7 +31,7 @@ export const cancelarMinuta = async (req: Request, res: Response) => {
     }
 
     // Verificar tareas
-    const tareasValidas = minuta.tareas.filter(t => t.estadoConceptual !== "DESCARTADO");
+    const tareasValidas = minuta.tareas.filter((t: any) => t.tipo !== "DESCARTADA");
     
     if (tareasValidas.length > 0) {
       return res.status(400).json({ error: "No se puede cancelar una minuta con tareas activas. Descarte las tareas primero." });

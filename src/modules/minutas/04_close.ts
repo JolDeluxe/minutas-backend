@@ -39,7 +39,7 @@ export const cerrarMinuta = async (req: Request, res: Response) => {
     const entradasPendientes = await prisma.tarea.count({
       where: {
         minutaId: id,
-        estado: { notIn: [EstadoTarea.CERRADO, EstadoTarea.COMPLETADO] },
+        estado: { notIn: [EstadoTarea.CERRADA, EstadoTarea.CANCELADA] },
       },
     });
 

@@ -42,41 +42,29 @@ enum Prioridad {
   CRITICA
 }
 
-enum EstadoConceptual {
-  CAPTURADO
-  EN_REVISION
-  CERRADO
-  DESCARTADO
+enum TipoEntrada {
+  SIN_ORGANIZAR
+  TAREA
+  RECORDATORIO
+  POLITICA
+  DESCARTADA
 }
 
-enum EstadoOperativo {
-  PENDIENTE
-  EN_PROGRESO
-  COMPLETADO
+enum AlcanceRecordatorio {
+  DEPARTAMENTO
+  PERSONAL
 }
 
 enum EstadoTarea {
   PENDIENTE
-  EN_PROGRESO
-  COMPLETADO
-  CERRADO
-}
-
-enum TipoAsignacion {
-  SEGUIMIENTO
-  EJECUTOR
-}
-
-enum EstadoAsignacion {
-  PENDIENTE
-  EN_PROGRESO
-  COMPLETADO
+  EN_REVISION
+  CERRADA
+  CANCELADA
 }
 
 enum EstadoMinuta {
   PROGRAMADA
   ACTIVA
-  EN_REVISION
   CERRADA
   CANCELADA
 }
@@ -118,7 +106,7 @@ model Usuario {
   minutasCerradas       Minuta[]             @relation("MinutaCerrador")
   minutasCanceladas     Minuta[]             @relation("MinutaCancelador")
   tareasCreadas         Tarea[]              @relation("TareaCreador")
-  tareasFormalizadas    Tarea[]              @relation("TareaFormalizador")
+  tareasOrganizadas     Tarea[]              @relation("TareaOrganizador")
   asignaciones          TareaAsignacion[]
   asignacionesCreadas   TareaAsignacion[]    @relation("TareaAsignador")
   historial             TareaHistorial[]
@@ -201,39 +189,34 @@ model NotaGeneral {
 /// pero conceptualmente representa ideas, acuerdos, observaciones, seguimientos y
 /// trabajo formalizado dentro de una minuta.
 model Tarea {
-  id          Int    @id @default(autoincrement())
-  descripcion String @db.Text
-
+  id           Int          @id @default(autoincrement())
+  descripcion  String       @db.Text
   departamento Departamento @default(DISENO)
 
-  // Fase 1: captura ligera durante junta.
-  area                Area      @default(DISENO)
-  linea               String?
-  clasificacion       String
-  fechaSeguimiento    DateTime?
-  requiereSeguimiento Boolean   @default(false)
+  // ── Campos de captura durante junta ─────────────────────
+  area          Area    @default(DISENO)
+  linea         String?
+  clasificacion String
 
-  // Fase 2: organizacion post-junta and formalizacion progresiva.
-  estadoConceptual EstadoConceptual @default(CAPTURADO)
-  formalizada      Boolean          @default(false)
-  formalizadoAt    DateTime?
-  formalizadoPorId Int?
-  formalizadoPor   Usuario?         @relation("TareaFormalizador", fields: [formalizadoPorId], references: [id], onDelete: SetNull)
+  // ── Clasificación post-junta ─────────────────────────────
+  tipo TipoEntrada @default(SIN_ORGANIZAR)
 
-  // Solo aplica a entradas formalizadas como trabajo operativo real.
+  organizadoPorId Int?
+  organizadoPor   Usuario?  @relation("TareaOrganizador", fields: [organizadoPorId], references: [id], onDelete: SetNull)
+  organizadoAt    DateTime?
+
+  // ── Solo aplica a tipo = TAREA ───────────────────────────
+  estado           EstadoTarea?
   prioridad        Prioridad?
-  estadoOperativo  EstadoOperativo?
   fechaVencimiento DateTime?
-  completadoAt     DateTime? // Fecha que cuenta para métricas.
+  completadoAt     DateTime?
+  cerradoAt        DateTime?
 
-  // Compatibilidad temporal con el backend actual.
-  estado    EstadoTarea @default(PENDIENTE)
-  cerradoAt DateTime? // Fecha de cierre (no afecta métricas)
+  // ── Solo aplica a tipo = RECORDATORIO ────────────────────
+  alcanceRecordatorio AlcanceRecordatorio?
 
-  // Flags de negocio legacy (calculados por backend al crear/actualizar)
-  capturaCompleta Boolean @default(false)
-  isExternalArea  Boolean @default(false)
-  pdfUrl          String? @db.Text
+  // ── Infraestructura ──────────────────────────────────────
+  pdfUrl String? @db.Text
 
   minutaId Int?
   minuta   Minuta? @relation(fields: [minutaId], references: [id], onDelete: SetNull)
@@ -251,23 +234,19 @@ model Tarea {
   updatedAt DateTime @updatedAt
 
   @@index([minutaId])
+  @@index([tipo])
   @@index([estado])
-  @@index([estadoConceptual])
-  @@index([estadoOperativo])
-  @@index([area])
   @@index([departamento])
-  @@index([isExternalArea])
-  @@index([capturaCompleta])
-  @@index([formalizada])
-  @@index([requiereSeguimiento])
-  @@index([fechaSeguimiento])
+  @@index([area])
+  @@index([linea])
+  @@index([clasificacion])
   @@index([fechaVencimiento])
   @@index([creadoPorId])
-  @@index([formalizadoPorId])
-  @@index([minutaId, estado])
-  @@index([formalizada, estadoOperativo])
-  @@index([fechaSeguimiento, estadoConceptual])
-  @@index([area, estado])
+  @@index([organizadoPorId])
+  @@index([minutaId, tipo])
+  @@index([tipo, estado])
+  @@index([departamento, tipo])
+  @@index([alcanceRecordatorio])
 }
 
 // <--- NUEVO MODELO: ANEXOS DENTRO DE UNA TAREA
@@ -290,10 +269,7 @@ model TareaNota {
 }
 
 model TareaAsignacion {
-  id           Int              @id @default(autoincrement())
-  tipo         TipoAsignacion   @default(EJECUTOR)
-  estado       EstadoAsignacion @default(PENDIENTE)
-  completadoAt DateTime?
+  id Int @id @default(autoincrement())
 
   tareaId Int
   tarea   Tarea @relation(fields: [tareaId], references: [id], onDelete: Cascade)
@@ -307,12 +283,10 @@ model TareaAsignacion {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([tareaId, usuarioId, tipo])
+  @@unique([tareaId, usuarioId])
   @@index([tareaId])
   @@index([usuarioId])
   @@index([asignadoPorId])
-  @@index([tipo])
-  @@index([estado])
 }
 
 model TareaImagen {
@@ -395,18 +369,19 @@ model PasswordResetToken {
 
 enum TipoNotificacion {
   ENTRADA_CAPTURADA
-  ENTRADA_FORMALIZADA
+  ENTRADA_ORGANIZADA
   ENTRADA_DESCARTADA
-  SEGUIMIENTO_ASIGNADO
-  SEGUIMIENTO_PROXIMO
-  NUEVAS_TAREAS
   TAREA_ASIGNADA
+  TAREA_EN_REVISION
   TAREA_COMPLETADA
   TAREA_CERRADA
+  TAREA_CANCELADA
   TAREA_MODIFICADA
+  RECORDATORIO_ASIGNADO
   REVISION_PENDIENTE
   VENCIMIENTO_PROXIMO
   LINEA_CAMBIADA
+  NUEVAS_ENTRADAS
 }
 
 model Notificacion {

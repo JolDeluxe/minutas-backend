@@ -6,12 +6,11 @@ import { prisma } from "../../db";
 import {
   Area,
   Prioridad,
-  EstadoConceptual,
   EstadoMinuta,
-  EstadoOperativo,
   EstadoTarea,
-  TipoAsignacion,
   Departamento,
+  TipoEntrada,
+  AlcanceRecordatorio,
 } from "@prisma/client";
 
 import {
@@ -22,8 +21,6 @@ import {
 import { uploadTaskImage } from "../../utils/cloudinary";
 
 import {
-  calcularIsExternalArea,
-  calcularCapturaCompleta,
   normalizarFechaVencimiento,
 } from "./helpers";
 
@@ -60,9 +57,9 @@ export const crearTarea = async (
         });
       }
 
-      if (minuta.estado === EstadoMinuta.CERRADA) {
+      if (minuta.estado === EstadoMinuta.CERRADA || minuta.estado === EstadoMinuta.CANCELADA) {
         return res.status(400).json({
-          error: `La minuta "${minuta.titulo}" está cerrada y no acepta nuevas entradas`,
+          error: `La minuta "${minuta.titulo}" está cerrada o cancelada y no acepta nuevas entradas`,
         });
       }
     }
@@ -72,7 +69,6 @@ export const crearTarea = async (
     const files =
       req.files as Express.Multer.File[] | undefined;
 
-    // FIX: Log de diagnóstico — te permite ver si los archivos llegan al backend
     console.log(
       `[crearTarea] archivos recibidos: ${files?.length ?? 0}`,
       files?.map((f) => `${f.fieldname}(${f.mimetype}, ${f.size}b)`) ?? []
@@ -85,32 +81,18 @@ export const crearTarea = async (
 
       if (!tareaInput) continue;
 
-      const isExternalArea =
-        calcularIsExternalArea(
-          tareaInput.area as Area | undefined
-        );
-
       const fechaVenc = normalizarFechaVencimiento(tareaInput.fechaVencimiento);
-
-      const fechaSeguimiento =
-        tareaInput.fechaSeguimiento
-          ? new Date(tareaInput.fechaSeguimiento)
-          : null;
 
       // Búsqueda Inteligente de Archivos
       let archivosDeEstaTarea = files
         ? files.filter((f) => f.fieldname.includes(`_tarea_${index}_`) || f.fieldname.includes(`_${index}_`))
         : [];
 
-      // Fallback: Si no encontramos por índice pero hay archivos "huérfanos" (no asignados a tareas previas), 
-      // y estamos ante la única tarea o la primera, tomamos lo que haya.
+      // Fallback
       if (archivosDeEstaTarea.length === 0 && files && files.length > 0) {
-          // Si solo hay una tarea, le damos todo lo que llegó (hasta 3)
           if (tareasPayload.length === 1) {
               archivosDeEstaTarea = files.slice(0, 3);
           } else {
-              // Si hay varias, intentamos una distribución secuencial simple si el mapeo por nombre falló
-              // Esto es un último recurso de seguridad
               const skip = index * 3;
               archivosDeEstaTarea = files.slice(skip, skip + 3);
           }
@@ -120,7 +102,6 @@ export const crearTarea = async (
       const imagenesData = await Promise.all(
         (archivosDeEstaTarea || []).slice(0, 3).map(async (file, i) => {
           try {
-            // FIX: pasa el mimetype real (image/png, image/webp, etc.)
             const { url, publicId } = await uploadTaskImage(
               file.buffer,
               file.mimetype
@@ -130,54 +111,24 @@ export const crearTarea = async (
             );
             return { url, publicId, orden: i + 1 };
           } catch (err) {
-            // El error es visible ahora; antes fallaba silenciosamente
             console.error(
               `[Cloudinary Error] Tarea ${index} Imagen ${i} (${file.mimetype}):`,
               err
             );
-            
             return null;
           }
         })
       );
 
-      // Limpiar fallidos
       const imagenesValidas = imagenesData.filter((img): img is { url: string; publicId: string; orden: number } => img !== null);
 
       const tareaId = await prisma.$transaction(async (tx) => {
-        const totalAsignaciones =
-          tareaInput.responsables?.length ?? 0;
-
-        // --- LÓGICA DE EXCLUSIVIDAD ---
-        // Una entrada es Tarea (Formalizada) O Seguimiento, pero no ambos.
-        let finalFechaVenc = fechaVenc;
-        let finalPrioridad = (tareaInput.prioridad as Prioridad | undefined) ?? null;
-        let finalRequiereSeguimiento = tareaInput.requiereSeguimiento ?? false;
-        let finalFechaSeguimiento = fechaSeguimiento;
-
-        if (finalRequiereSeguimiento) {
-          // Si es seguimiento, no puede ser tarea operativa (quita vencimiento y prioridad)
-          finalFechaVenc = null;
-          finalPrioridad = null;
-        }
-
-        const capturaCompleta = calcularCapturaCompleta({
-          clasificacion: (tareaInput.clasificacion as string | undefined) ?? null,
-          fechaVencimiento: finalFechaVenc,
-          totalAsignaciones,
-        });
-
-        if (capturaCompleta) {
-          // Si se formaliza como tarea, se apaga el modo seguimiento informativo
-          finalRequiereSeguimiento = false;
-          finalFechaSeguimiento = null;
-        }
-        // ------------------------------
-
         let departamento: Departamento = req.user!.departamento ?? "DISENO";
         if (req.user!.rol === "ADMIN") {
           departamento = tareaInput.area === "MARKETING" ? "MARKETING" : "DISENO";
         }
+
+        const tipoEntrada = tareaInput.tipo ?? TipoEntrada.SIN_ORGANIZAR;
 
         const nueva = await tx.tarea.create({
           data: {
@@ -186,31 +137,13 @@ export const crearTarea = async (
             minutaId: tareaInput.minutaId ?? null,
             departamento: departamento,
             area: (tareaInput.area as Area | undefined) ?? Area.DISENO,
-            prioridad: finalPrioridad,
+            prioridad: tareaInput.prioridad ?? null,
             linea: (tareaInput.linea as string | undefined) ?? null,
             clasificacion: tareaInput.clasificacion ?? "OTROS",
-            fechaVencimiento: finalFechaVenc,
-            fechaSeguimiento: finalFechaSeguimiento,
-            requiereSeguimiento: finalRequiereSeguimiento,
-
-            estadoConceptual:
-              EstadoConceptual.CAPTURADO,
-
-            estadoOperativo:
-              totalAsignaciones > 0
-                ? EstadoOperativo.PENDIENTE
-                : null,
-
-            estado: EstadoTarea.PENDIENTE,
-
-            capturaCompleta,
-
-            // Formalizada se setea automáticamente cuando la captura está completa
-            formalizada: capturaCompleta,
-            formalizadoAt: capturaCompleta ? new Date() : null,
-            formalizadoPorId: capturaCompleta ? usuarioId : null,
-
-            isExternalArea,
+            fechaVencimiento: fechaVenc,
+            tipo: tipoEntrada,
+            estado: tareaInput.estado ?? (tipoEntrada === TipoEntrada.TAREA ? EstadoTarea.PENDIENTE : null),
+            alcanceRecordatorio: tareaInput.alcanceRecordatorio ?? null,
 
             imagenes: {
               create: imagenesValidas,
@@ -238,11 +171,9 @@ export const crearTarea = async (
               (uid) => ({
                 tareaId: nueva.id,
                 usuarioId: uid,
-                tipo: TipoAsignacion.EJECUTOR,
                 asignadoPorId: usuarioId,
               })
             ),
-
             skipDuplicates: true,
           });
         }
@@ -255,14 +186,12 @@ export const crearTarea = async (
           where: {
             id: tareaId,
           },
-
           include: {
             imagenes: {
               orderBy: {
                 orden: "asc",
               },
             },
-
             asignaciones: {
               include: {
                 usuario: {
@@ -277,7 +206,6 @@ export const crearTarea = async (
                 },
               },
             },
-
             creadoPor: {
               select: {
                 id: true,
@@ -287,7 +215,6 @@ export const crearTarea = async (
                 linea: true,
               },
             },
-
             minuta: {
               select: {
                 id: true,
@@ -295,7 +222,6 @@ export const crearTarea = async (
                 estado: true,
               },
             },
-
             notas: {
               orderBy: {
                 createdAt: "desc",
@@ -318,9 +244,7 @@ export const crearTarea = async (
         .to("global_updates")
         .emit("nuevas_tareas_creadas", {
           minutaId,
-
           cantidad: tareasPayload.length,
-
           tareas: tareasCompletasResp.map((t) => ({
             id: t.id,
             linea: t.linea,
@@ -342,7 +266,7 @@ export const crearTarea = async (
     );
 
     return res.status(500).json({
-      error: "Error al crear las tareas",
+      error: "Error al crear las entradas organizacionales",
     });
   }
 };

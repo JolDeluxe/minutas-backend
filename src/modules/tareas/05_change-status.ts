@@ -1,303 +1,150 @@
 // minutas-backend/src/modules/tareas/05_change-status.ts
 
 import type { Request, Response } from "express";
-
 import { prisma } from "../../db";
-
 import {
   EstadoTarea,
-  EstadoAsignacion,
-  EstadoOperativo,
   Rol,
-  TipoAsignacion,
+  TipoEntrada,
+  TipoNotificacion,
 } from "@prisma/client";
-
-import {
-  registrarAccion,
-  registrarError,
-} from "../../utils/logger";
-
-import {
-  registrarCambio,
-  evaluarEstadoMinuta,
-} from "./helpers";
-
+import { registrarAccion, registrarError } from "../../utils/logger";
+import { registrarCambio, evaluarEstadoMinuta } from "./helpers";
 import { getIO } from "../../utils/socket";
+import type { ChangeEstadoInput, ChangeEstadoParams } from "./zod";
 
-import type {
-  ChangeEstadoInput,
-  ChangeEstadoParams,
-} from "./zod";
-
-export const changeEstadoTarea = async (
-  req: Request,
-  res: Response
-) => {
+export const changeEstadoTarea = async (req: Request, res: Response) => {
   try {
     const usuarioId = req.user!.id;
-
     const rolUsuario = req.user!.rol;
+    const { id } = req.params as unknown as ChangeEstadoParams;
+    const { estado } = req.body as ChangeEstadoInput;
 
-    const { id } =
-      req.params as unknown as ChangeEstadoParams;
-
-    const { estado } =
-      req.body as ChangeEstadoInput;
-
-    const tarea =
-      await prisma.tarea.findUnique({
-        where: { id },
-
-        include: {
-          asignaciones: true,
-        },
-      });
+    const tarea = await prisma.tarea.findUnique({
+      where: { id },
+      include: {
+        asignaciones: true,
+      },
+    });
 
     if (!tarea) {
-      return res.status(404).json({
-        error: "Tarea no encontrada",
-      });
+      return res.status(404).json({ error: "Entrada no encontrada" });
     }
 
-    const rolesJefatura: Rol[] = [
-      Rol.GERENCIA,
-      Rol.JEFE,
-    ];
-
-    const esJefeOGerente =
-      rolesJefatura.includes(rolUsuario);
-
-    if (
-      tarea.isExternalArea &&
-      !esJefeOGerente
-    ) {
-      return res.status(403).json({
-        error:
-          "Las tareas externas no pueden ser modificadas por coordinadores.",
-      });
+    if (tarea.tipo !== TipoEntrada.TAREA) {
+      return res.status(400).json({ error: "Solo las entradas clasificadas como TAREA tienen flujo de estados" });
     }
 
-    const asignacionDelUsuario =
-      tarea.asignaciones.find(
-        (a) => a.usuarioId === usuarioId
-      );
+    const esJefeOGerente = [Rol.GERENCIA as string, Rol.JEFE as string].includes(rolUsuario);
 
+    // ── LÓGICA DE TRANSICIONES ──────────────────────────────────
     if (!esJefeOGerente) {
-      if (!asignacionDelUsuario) {
+      // Regla Coordinador: Solo puede enviar a EN_REVISION si está PENDIENTE
+      const asignado = tarea.asignaciones.some(a => a.usuarioId === usuarioId);
+      if (!asignado) {
+        return res.status(403).json({ error: "No tienes esta tarea asignada." });
+      }
+
+      if (estado !== EstadoTarea.EN_REVISION) {
         return res.status(403).json({
-          error:
-            "No tienes esta tarea asignada.",
+           error: "Como coordinador, solo puedes enviar la tarea a revisión.",
         });
       }
 
-      const estadoAsig =
-        estado === EstadoTarea.COMPLETADO
-          ? EstadoAsignacion.COMPLETADO
-          : estado === EstadoTarea.EN_PROGRESO
-          ? EstadoAsignacion.EN_PROGRESO
-          : EstadoAsignacion.PENDIENTE;
-
-      await prisma.tareaAsignacion.update({
-        where: {
-          id: asignacionDelUsuario.id,
-        },
-
-        data: {
-          estado: estadoAsig,
-
-          completadoAt:
-            estadoAsig ===
-            EstadoAsignacion.COMPLETADO
-              ? new Date()
-              : null,
-        },
-      });
-
-      // Solo evaluar EJECUTORES para determinar si la tarea global está completa
-      const asignacionesEjecutores =
-        await prisma.tareaAsignacion.findMany({
-          where: {
-            tareaId: id,
-            tipo: TipoAsignacion.EJECUTOR,
-          },
-        });
-
-      const todosEjecutoresCompletaron =
-        asignacionesEjecutores.length > 0 &&
-        asignacionesEjecutores.every(
-          (a) =>
-            a.estado ===
-            EstadoAsignacion.COMPLETADO
-        );
-
-      const algunEjecutorEnProgreso =
-        asignacionesEjecutores.some(
-          (a) =>
-            a.estado ===
-            EstadoAsignacion.EN_PROGRESO
-        );
-
-      let nuevoEstadoGlobal: EstadoTarea = tarea.estado;
-
-      let nuevoEstadoOperativo:
-        | EstadoOperativo
-        | null = tarea.estadoOperativo;
-
-      if (todosEjecutoresCompletaron) {
-        // COORDINADORES: Nunca auto-aprobamos a CERRADO. Siempre a COMPLETADO (Esperando revisión).
-        nuevoEstadoGlobal =
-          EstadoTarea.COMPLETADO;
-
-        nuevoEstadoOperativo =
-          EstadoOperativo.COMPLETADO;
-      } else if (algunEjecutorEnProgreso) {
-        nuevoEstadoGlobal =
-          EstadoTarea.EN_PROGRESO;
-
-        nuevoEstadoOperativo =
-          EstadoOperativo.EN_PROGRESO;
-      }
-
-      const dataUpdate: Record<string, any> = {
-        estado: nuevoEstadoGlobal,
-        estadoOperativo: nuevoEstadoOperativo,
-      };
-
-      if (nuevoEstadoGlobal === EstadoTarea.COMPLETADO) {
-        dataUpdate.completadoAt = new Date();
-      } else {
-        dataUpdate.completadoAt = null;
-      }
-
-      await prisma.tarea.update({
-        where: { id },
-        data: dataUpdate,
-      });
-
-      if (nuevoEstadoGlobal !== tarea.estado) {
-        await registrarCambio(
-          id,
-          usuarioId,
-          "estado",
-          tarea.estado,
-          nuevoEstadoGlobal
-        );
+      if (tarea.estado === EstadoTarea.CERRADA || tarea.estado === EstadoTarea.CANCELADA) {
+         return res.status(400).json({ error: "La tarea ya está cerrada o cancelada." });
       }
     } else {
-      const dataUpdate: Record<string, any> = {
-        estado,
-      };
-
-      if (
-        estado === EstadoTarea.EN_PROGRESO
-      ) {
-        dataUpdate.estadoOperativo =
-          EstadoOperativo.EN_PROGRESO;
+      // Jefatura / Gerencia
+      // Tienen libertad de mover entre PENDIENTE, EN_REVISION, CERRADA, CANCELADA.
+      if (tarea.estado === EstadoTarea.CERRADA || tarea.estado === EstadoTarea.CANCELADA) {
+          // Generalmente las cerradas no se reabren, pero si el jefe lo fuerza, se lo permitimos o lo bloqueamos.
+          // Por seguridad vamos a bloquearlo a menos que sea un requerimiento específico.
+          if (estado !== EstadoTarea.CERRADA && estado !== EstadoTarea.CANCELADA) {
+              return res.status(400).json({ error: "No se puede reabrir una tarea que ya ha sido finalizada." });
+          }
       }
+    }
 
-      const esAsignado = tarea.asignaciones.some(a => a.usuarioId === usuarioId);
+    const dataUpdate: Record<string, any> = { estado };
 
-      if (estado === EstadoTarea.COMPLETADO) {
-        if (esAsignado) {
-          // AUTO-APROBACIÓN para JEFES: Se archiva de una vez.
-          dataUpdate.estado = EstadoTarea.CERRADO;
-          dataUpdate.estadoOperativo = null;
-          dataUpdate.completadoAt = new Date();
-          dataUpdate.cerradoAt = new Date();
-        } else {
-          dataUpdate.estadoOperativo = EstadoOperativo.COMPLETADO;
-          dataUpdate.completadoAt = new Date();
+    if (estado === EstadoTarea.CERRADA) {
+      dataUpdate.completadoAt = new Date();
+      dataUpdate.cerradoAt = new Date();
+    } else if (estado === EstadoTarea.CANCELADA) {
+      dataUpdate.cerradoAt = new Date();
+    } else {
+      dataUpdate.completadoAt = null;
+      dataUpdate.cerradoAt = null;
+    }
+
+    await prisma.$transaction(async (tx) => {
+        await tx.tarea.update({
+          where: { id },
+          data: dataUpdate,
+        });
+
+        // Notificaciones según el estado
+        if (estado === EstadoTarea.EN_REVISION && tarea.organizadoPorId) {
+             await tx.notificacion.create({
+                 data: {
+                     usuarioId: tarea.organizadoPorId,
+                     tipo: TipoNotificacion.TAREA_EN_REVISION,
+                     titulo: 'Tarea en Revisión',
+                     cuerpo: `El equipo ha marcado la tarea como completada y espera tu revisión.`,
+                     tareaId: id
+                 }
+             });
+        } else if (estado === EstadoTarea.CERRADA || estado === EstadoTarea.CANCELADA) {
+             // Notificar a los asignados
+             for (const asig of tarea.asignaciones) {
+                 await tx.notificacion.create({
+                     data: {
+                         usuarioId: asig.usuarioId,
+                         tipo: estado === EstadoTarea.CERRADA ? TipoNotificacion.TAREA_CERRADA : TipoNotificacion.TAREA_CANCELADA,
+                         titulo: estado === EstadoTarea.CERRADA ? 'Tarea Cerrada' : 'Tarea Cancelada',
+                         cuerpo: `La tarea ha sido ${estado === EstadoTarea.CERRADA ? 'cerrada aprobada' : 'cancelada'} por el gerente.`,
+                         tareaId: id
+                     }
+                 });
+             }
         }
-      }
+    });
 
-      if (estado === EstadoTarea.CERRADO) {
-        dataUpdate.cerradoAt = new Date();
-        dataUpdate.estadoOperativo = null;
-      }
-
-      await prisma.tarea.update({
-        where: { id },
-        data: dataUpdate,
-      });
-
-      await registrarCambio(
-        id,
-        usuarioId,
-        "estado",
-        tarea.estado,
-        estado
-      );
+    if (estado !== tarea.estado) {
+      await registrarCambio(id, usuarioId, "estado", tarea.estado, estado);
     }
 
     if (tarea.minutaId) {
-      await evaluarEstadoMinuta(
-        tarea.minutaId
-      );
+      await evaluarEstadoMinuta(tarea.minutaId);
     }
 
-    await registrarAccion(
-      "CAMBIO_ESTADO_TAREA",
-      usuarioId,
-      `Cambio de estado en tarea ${id}`
-    );
+    await registrarAccion("CAMBIO_ESTADO_TAREA", usuarioId, `Tarea ${id} movida a ${estado}`);
 
-    const tareaActualizada =
-      await prisma.tarea.findUnique({
-        where: { id },
-
-        include: {
-          asignaciones: {
-            include: {
-              usuario: {
-                select: {
-                  id: true,
-                  nombre: true,
-                  username: true,
-                  imagen: true,
-                  rol: true,
-                  linea: true,
-                },
-              },
-            },
-          },
-
-          minuta: {
-            select: {
-              id: true,
-              titulo: true,
-              estado: true,
-            },
-          },
-
-          notas: {
-            orderBy: {
-              createdAt: "desc",
+    const tareaActualizada = await prisma.tarea.findUnique({
+      where: { id },
+      include: {
+        asignaciones: {
+          include: {
+            usuario: {
+              select: { id: true, nombre: true, username: true, imagen: true, rol: true, linea: true },
             },
           },
         },
-      });
+        minuta: {
+          select: { id: true, titulo: true, estado: true },
+        },
+        notas: { orderBy: { createdAt: "desc" } },
+      },
+    });
 
     try {
-      getIO()
-        .to("global_updates")
-        .emit("tarea_estado_cambiado", {
-          tareaId: id,
-        });
+      getIO().to("global_updates").emit("tarea_estado_cambiado", { tareaId: id });
     } catch (_) {}
 
-    return res.json({
-      status: "success",
-      data: tareaActualizada,
-    });
+    return res.json({ status: "success", data: tareaActualizada });
   } catch (error) {
-    await registrarError(
-      "CAMBIO_ESTADO_TAREA",
-      req.user?.id ?? null,
-      error
-    );
-
-    return res.status(500).json({
-      error: "Error al cambiar estado",
-    });
+    await registrarError("CAMBIO_ESTADO_TAREA", req.user?.id ?? null, error);
+    return res.status(500).json({ error: "Error al cambiar estado" });
   }
 };

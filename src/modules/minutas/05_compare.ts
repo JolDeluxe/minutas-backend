@@ -3,17 +3,10 @@ import { prisma } from "../../db";
 import { registrarError } from "../../utils/logger";
 import type { MinutaIdParams } from "./zod";
 
-/**
- * GET /api/minutas/:id/compare
- * Compara la minuta actual con la inmediatamente anterior (por fecha, misma línea).
- * Retorna cuántas entradas se completaron desde la anterior, cuántas siguen pendientes,
- * cuántas son nuevas y cuántas están atrasadas.
- */
 export const compararConAnterior = async (req: Request, res: Response) => {
   try {
     const { id } = req.params as unknown as MinutaIdParams;
 
-    // Obtener la minuta actual
     const minutaActual = await prisma.minuta.findUnique({
       where: { id },
       select: { id: true, titulo: true, fechaProgramada: true, lineaDefault: true },
@@ -23,7 +16,6 @@ export const compararConAnterior = async (req: Request, res: Response) => {
       return res.status(404).json({ error: "Minuta no encontrada" });
     }
 
-    // Buscar la minuta inmediatamente anterior (misma línea, fecha anterior)
     const minutaAnterior = await prisma.minuta.findFirst({
       where: {
         id: { not: id },
@@ -47,39 +39,36 @@ export const compararConAnterior = async (req: Request, res: Response) => {
 
     const now = new Date();
 
-    // Entradas de la minuta anterior y su estado ACTUAL
     const entradasAnterior = await prisma.tarea.findMany({
       where: { minutaId: minutaAnterior.id },
       select: {
         id: true,
         estado: true,
-        estadoOperativo: true,
+        tipo: true,
         fechaVencimiento: true,
         completadoAt: true,
       },
     });
 
-    // Entradas de la minuta actual
     const entradasActual = await prisma.tarea.findMany({
       where: { minutaId: id },
       select: {
         id: true,
         estado: true,
-        estadoOperativo: true,
+        tipo: true,
         fechaVencimiento: true,
       },
     });
 
-    // Calcular comparación
     let completadasDesdeAnterior = 0;
     let sigueEnProgreso = 0;
     let siguePendiente = 0;
     let atrasadasAnterior = 0;
 
     for (const t of entradasAnterior) {
-      if (t.estado === "COMPLETADO" || t.estado === "CERRADO") {
+      if (t.estado === "CERRADA" || t.estado === "CANCELADA") {
         completadasDesdeAnterior++;
-      } else if (t.estadoOperativo === "EN_PROGRESO") {
+      } else if (t.estado === "EN_REVISION") {
         sigueEnProgreso++;
         if (t.fechaVencimiento && new Date(t.fechaVencimiento) < now) {
           atrasadasAnterior++;
@@ -99,8 +88,8 @@ export const compararConAnterior = async (req: Request, res: Response) => {
       if (
         t.fechaVencimiento &&
         new Date(t.fechaVencimiento) < now &&
-        t.estado !== "COMPLETADO" &&
-        t.estado !== "CERRADO"
+        t.estado !== "CERRADA" &&
+        t.estado !== "CANCELADA"
       ) {
         atrasadasActual++;
       }

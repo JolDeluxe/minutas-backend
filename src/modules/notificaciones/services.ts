@@ -66,7 +66,7 @@ export const notificarNuevasTareas = async (
 
     await persistirYEmitir(
       [...idsJefesSet],
-      TipoNotificacion.NUEVAS_TAREAS,
+      TipoNotificacion.NUEVAS_ENTRADAS,
       titulo,
       cuerpo
     );
@@ -128,7 +128,7 @@ export const notificarCambioEstado = async (
     const idsGerencia = await obtenerIdsGerencia();
 
     switch (nuevoEstado) {
-      case EstadoTarea.COMPLETADO: {
+      case EstadoTarea.EN_REVISION: {
         // Notificar al Jefe y Gerencia: la tarea espera revisión y cierre
         const destinatarios = [
           ...new Set([
@@ -148,7 +148,7 @@ export const notificarCambioEstado = async (
         break;
       }
 
-      case EstadoTarea.CERRADO: {
+      case EstadoTarea.CERRADA: {
         // Notificar a los responsables asignados que la tarea fue cerrada
         if (idsAsignados.length > 0) {
           await persistirYEmitir(

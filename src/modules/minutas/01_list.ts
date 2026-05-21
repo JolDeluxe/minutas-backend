@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 import { prisma } from "../../db";
-import { Prisma, EstadoOperativo } from "@prisma/client";
+import { Prisma, EstadoTarea, TipoEntrada } from "@prisma/client";
 import { registrarError } from "../../utils/logger";
 import { buildMinutasWhere } from "./helpers";
 import { USUARIO_SELECT_BASICO } from "../shared-selects";
@@ -41,8 +41,8 @@ export const listarMinutas = async (req: Request, res: Response) => {
           tareas: {
             select: {
               id: true,
+              tipo: true,
               estado: true,
-              estadoOperativo: true,
               fechaVencimiento: true,
               completadoAt: true,
             },
@@ -81,23 +81,19 @@ export const listarMinutas = async (req: Request, res: Response) => {
     const minutasConResumen = minutas.map((m) => {
       const tareas = m.tareas || [];
       const totalEntradas = tareas.length;
-      let completadas = 0;
-      let enProgreso = 0;
+      let completadas = 0; // Se mapea EN_REVISION a "completadas" visualmente para UI
       let pendientes = 0;
       let atrasadas = 0;
       let cerradas = 0;
 
       for (const t of tareas) {
-        if (t.estado === "CERRADO") {
+        if (t.tipo !== TipoEntrada.TAREA) continue;
+
+        if (t.estado === EstadoTarea.CERRADA) {
           cerradas++;
-        } else if (t.estado === "COMPLETADO" || t.estadoOperativo === EstadoOperativo.COMPLETADO) {
-          completadas++;
-        } else if (t.estadoOperativo === EstadoOperativo.EN_PROGRESO) {
-          enProgreso++;
-          if (t.fechaVencimiento && new Date(t.fechaVencimiento) < now) {
-            atrasadas++;
-          }
-        } else {
+        } else if (t.estado === EstadoTarea.EN_REVISION) {
+          completadas++; // Esperando revisión pero completada por el ejecutor
+        } else if (t.estado === EstadoTarea.PENDIENTE) {
           pendientes++;
           if (t.fechaVencimiento && new Date(t.fechaVencimiento) < now) {
             atrasadas++;
@@ -108,20 +104,23 @@ export const listarMinutas = async (req: Request, res: Response) => {
       // Remove raw tareas from response (only keep _count and resumen)
       const { tareas: _tareas, ...minutaSinTareas } = m;
 
+      // Solo consideramos TAREAS (que tienen estado) para el porcentaje
+      const totalTareasOperativas = cerradas + completadas + pendientes;
+
       return {
         ...minutaSinTareas,
         departamento: m.departamento, // include for frontend logic
         isJuntaActual: m.departamento === 'DISENO' ? m.id === ultimaJuntaId.DISENO : m.id === ultimaJuntaId.MARKETING,
         isJuntaAnterior: m.departamento === 'DISENO' ? m.id === juntaAnteriorId.DISENO : m.id === juntaAnteriorId.MARKETING,
         resumenOperativo: {
-          totalEntradas,
+          totalEntradas, // Count of all entries (including reminders, unorganized, etc)
           completadas,
-          enProgreso,
+          enProgreso: 0, // Legacy support
           pendientes,
           atrasadas,
           cerradas,
-          porcentajeCompletado: totalEntradas > 0
-            ? Math.round(((completadas + cerradas) / totalEntradas) * 100)
+          porcentajeCompletado: totalTareasOperativas > 0
+            ? Math.round(((completadas + cerradas) / totalTareasOperativas) * 100)
             : 0,
         },
       };
