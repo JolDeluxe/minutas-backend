@@ -15,12 +15,12 @@ export const evaluateMinutaStatus = async (
 ): Promise<void> => {
   const minuta = await prisma.minuta.findUnique({
     where: { id: minutaId },
-    select: { estado: true, cerradoPorId: true },
+    select: { estado: true, cerradoPorId: true, departamento: true },
   });
 
   if (!minuta) return;
 
-  const { estado } = minuta;
+  const { estado, departamento } = minuta;
 
   // Solo el evaluador opera sobre minutas que ya pasaron la sesión viva (EN_CURSO)
   // No evaluamos PROGRAMADA, CANCELADA ni EN_CURSO automáticamente porque dependen de acciones manuales directas
@@ -33,22 +33,29 @@ export const evaluateMinutaStatus = async (
   }
 
   const entradas = await prisma.tarea.findMany({
-    where: { minutaId },
-    select: { tipo: true, estado: true },
+    where: { minutaId, tipo: { not: TipoEntrada.DESCARTADA } },
+    select: { tipo: true, estado: true, area: true },
   });
 
-  if (entradas.length === 0) {
-    // Si no tiene entradas y estaba en organizacion o activa, se puede cerrar directo
+  // Filtrar solo entradas internas (las externas no bloquean la minuta)
+  const entradasInternas = entradas.filter((e) => {
+    const isExterna = (departamento === 'DISENO' && e.area === 'MARKETING') ||
+                      (departamento === 'MARKETING' && e.area === 'DISENO');
+    return !isExterna;
+  });
+
+  if (entradasInternas.length === 0) {
+    // Si no tiene entradas operativas y estaba en organizacion o activa, se puede cerrar directo
     if (estado !== EstadoMinuta.CERRADA) {
       await transitionMinutaStatus(minutaId, EstadoMinuta.CERRADA, triggeredByUserId);
     }
     return;
   }
 
-  const hasUnorganizedEntries = entradas.some((e) => e.tipo === TipoEntrada.SIN_ORGANIZAR);
+  const hasUnorganizedEntries = entradasInternas.some((e) => e.tipo === TipoEntrada.SIN_ORGANIZAR);
   
   // Consideramos seguimiento activo a cualquier entrada (principalmente TAREAS) que tenga estado PENDIENTE o EN_REVISION.
-  const hasActiveTracking = entradas.some(
+  const hasActiveTracking = entradasInternas.some(
     (e) =>
       (e.tipo === TipoEntrada.TAREA || e.estado != null) &&
       e.estado !== EstadoTarea.CERRADA &&

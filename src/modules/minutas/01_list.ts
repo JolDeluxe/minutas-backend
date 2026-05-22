@@ -43,6 +43,7 @@ export const listarMinutas = async (req: Request, res: Response) => {
               id: true,
               tipo: true,
               estado: true,
+              area: true,
               fechaVencimiento: true,
               completadoAt: true,
             },
@@ -89,6 +90,11 @@ export const listarMinutas = async (req: Request, res: Response) => {
       for (const t of tareas) {
         if (t.tipo !== TipoEntrada.TAREA) continue;
 
+        // Ignorar tareas externas para el KPI operativo del dashboard
+        const isExterna = (m.departamento === 'DISENO' && t.area === 'MARKETING') || 
+                          (m.departamento === 'MARKETING' && t.area === 'DISENO');
+        if (isExterna) continue;
+
         if (t.estado === EstadoTarea.CERRADA) {
           cerradas++;
         } else if (t.estado === EstadoTarea.EN_REVISION) {
@@ -104,7 +110,7 @@ export const listarMinutas = async (req: Request, res: Response) => {
       // Remove raw tareas from response (only keep _count and resumen)
       const { tareas: _tareas, ...minutaSinTareas } = m;
 
-      // Solo consideramos TAREAS (que tienen estado) para el porcentaje
+      // Solo consideramos TAREAS internas (que tienen estado) para el porcentaje
       const totalTareasOperativas = cerradas + completadas + pendientes;
 
       return {

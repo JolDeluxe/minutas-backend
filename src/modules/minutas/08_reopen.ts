@@ -23,12 +23,12 @@ export const reabrirMinuta = async (req: Request, res: Response) => {
       return res.status(403).json({ error: "No tienes permiso para acceder a esta minuta." });
     }
 
-    if (minuta.estado !== EstadoMinuta.CERRADA) {
-      return res.status(400).json({ error: "Solo se pueden reabrir minutas que estén cerradas." });
+    if (minuta.estado !== EstadoMinuta.EN_ORGANIZACION && minuta.estado !== EstadoMinuta.ACTIVA) {
+      return res.status(400).json({ error: "Solo se pueden reabrir minutas que estén en Organización o Activas." });
     }
 
-    // Al reabrir, regresamos a EN_ORGANIZACION para que puedan organizar lo que haga falta
-    await transitionMinutaStatus(id, EstadoMinuta.EN_ORGANIZACION, usuarioId);
+    // Al reabrir, regresamos a EN_CURSO para que puedan agregar entradas
+    await transitionMinutaStatus(id, EstadoMinuta.EN_CURSO, usuarioId);
 
     const minutaActualizada = await prisma.minuta.findUnique({ where: { id } });
 
@@ -37,10 +37,11 @@ export const reabrirMinuta = async (req: Request, res: Response) => {
     return res.json({
       status: "success",
       data: minutaActualizada,
-      message: "Minuta reabierta correctamente",
+      message: "Sesión reabierta correctamente",
     });
   } catch (error) {
     await registrarError("REABRIR_MINUTA", req.user?.id ?? null, error);
     return res.status(500).json({ error: "Error al reabrir la minuta" });
   }
 };
+

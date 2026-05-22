@@ -3,6 +3,7 @@ import { prisma } from "../../db";
 import { Rol } from "@prisma/client";
 import { registrarAccion, registrarError } from "../../utils/logger";
 import { deleteImageByPublicId } from "../../utils/cloudinary";
+import { evaluarEstadoMinuta } from "./helpers";
 import type { DeleteTareaParams } from "./zod";
 
 export const deleteTarea = async (
@@ -69,6 +70,10 @@ export const deleteTarea = async (
       usuarioId,
       `Entrada organizacional eliminada ID ${id}`
     );
+
+    if (tarea.minutaId) {
+      await evaluarEstadoMinuta(tarea.minutaId, usuarioId);
+    }
 
     return res.json({
       status: "success",

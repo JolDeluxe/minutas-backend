@@ -18,7 +18,7 @@ export const crearMinuta = async (req: Request, res: Response) => {
     };
 
     if (iniciarInmediatamente) {
-      data.estado = "ACTIVA";
+      data.estado = "EN_CURSO";
       data.fechaRealizada = new Date();
 
       // Find previous

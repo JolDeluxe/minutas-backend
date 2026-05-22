@@ -8,10 +8,10 @@ type TransitionsMatrix = {
 const VALID_TRANSITIONS: TransitionsMatrix = {
   [EstadoMinuta.PROGRAMADA]: [EstadoMinuta.EN_CURSO, EstadoMinuta.CANCELADA],
   [EstadoMinuta.EN_CURSO]: [EstadoMinuta.EN_ORGANIZACION, EstadoMinuta.CANCELADA],
-  [EstadoMinuta.EN_ORGANIZACION]: [EstadoMinuta.ACTIVA, EstadoMinuta.CERRADA],
-  [EstadoMinuta.ACTIVA]: [EstadoMinuta.CERRADA, EstadoMinuta.CANCELADA, EstadoMinuta.EN_ORGANIZACION], // Added EN_ORGANIZACION to allow regression if new unorganized entries appear
-  [EstadoMinuta.CERRADA]: [EstadoMinuta.EN_ORGANIZACION, EstadoMinuta.ACTIVA], // Added ACTIVA and EN_ORGANIZACION for reopening
-  [EstadoMinuta.CANCELADA]: [], // Terminal state, though we might allow reopening if necessary later
+  [EstadoMinuta.EN_ORGANIZACION]: [EstadoMinuta.ACTIVA, EstadoMinuta.CERRADA, EstadoMinuta.EN_CURSO],
+  [EstadoMinuta.ACTIVA]: [EstadoMinuta.CERRADA, EstadoMinuta.CANCELADA, EstadoMinuta.EN_ORGANIZACION, EstadoMinuta.EN_CURSO],
+  [EstadoMinuta.CERRADA]: [],
+  [EstadoMinuta.CANCELADA]: [], 
 };
 
 export const transitionMinutaStatus = async (

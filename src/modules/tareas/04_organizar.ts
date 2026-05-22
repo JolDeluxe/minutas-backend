@@ -4,7 +4,7 @@ import type { Request, Response } from "express";
 import { prisma } from "../../db";
 import { Rol, EstadoTarea, TipoEntrada, TipoNotificacion } from "@prisma/client";
 import { registrarAccion, registrarError } from "../../utils/logger";
-import { registrarCambio, normalizarFechaVencimiento } from "./helpers";
+import { registrarCambio, normalizarFechaVencimiento, evaluarEstadoMinuta } from "./helpers";
 import type { OrganizarTareaInput, OrganizarTareaParams } from "./zod";
 
 export const organizarTarea = async (req: Request, res: Response) => {
@@ -116,6 +116,11 @@ export const organizarTarea = async (req: Request, res: Response) => {
     }
 
     await registrarAccion("ORGANIZAR_ENTRADA", usuarioId, `Entrada organizacional ${id} clasificada como ${datos.tipo}`);
+
+    // Reevaluar estado de la minuta
+    if (tareaActual.minutaId) {
+      await evaluarEstadoMinuta(tareaActual.minutaId, usuarioId);
+    }
 
     const tareaActualizada = await prisma.tarea.findUnique({
       where: { id },
