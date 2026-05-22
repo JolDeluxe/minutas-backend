@@ -3,6 +3,9 @@ import { prisma } from "../../db";
 import { registrarAccion, registrarError } from "../../utils/logger";
 import type { MinutaIdParams } from "./zod";
 
+import { EstadoMinuta } from "@prisma/client";
+import { transitionMinutaStatus } from "./domain/minuta-transitions";
+
 export const iniciarMinuta = async (req: Request, res: Response) => {
   try {
     const usuarioId = req.user!.id;
@@ -27,7 +30,7 @@ export const iniciarMinuta = async (req: Request, res: Response) => {
       return res.status(403).json({ error: "No tienes permiso para acceder a esta minuta." });
     }
 
-    if (minuta.estado !== "PROGRAMADA") {
+    if (minuta.estado !== EstadoMinuta.PROGRAMADA) {
       return res.status(400).json({ error: "Solo se pueden iniciar minutas PROGRAMADAS" });
     }
 
@@ -35,28 +38,27 @@ export const iniciarMinuta = async (req: Request, res: Response) => {
     const anterior = await prisma.minuta.findFirst({
       where: {
         lineaDefault: minuta.lineaDefault,
-        estado: "CERRADA"
+        estado: EstadoMinuta.CERRADA
       },
       orderBy: {
         fechaRealizada: "desc"
       }
     });
 
-    const data: any = {
-      estado: "ACTIVA",
-      fechaRealizada: new Date(),
-    };
-
     if (anterior) {
-      data.minutaAnteriorId = anterior.id;
+      await prisma.minuta.update({
+        where: { id },
+        data: { minutaAnteriorId: anterior.id },
+      });
     }
 
-    const updated = await prisma.minuta.update({
-      where: { id },
-      data,
-    });
+    await transitionMinutaStatus(id, EstadoMinuta.EN_CURSO, usuarioId);
+
+    const updated = await prisma.minuta.findUnique({ where: { id } });
 
     await registrarAccion("INICIAR_MINUTA", usuarioId, `Minuta: "${minuta.titulo}"`);
+
+    return res.status(200).json({ status: "success", data: updated });
 
     return res.status(200).json({ status: "success", data: updated });
   } catch (error) {

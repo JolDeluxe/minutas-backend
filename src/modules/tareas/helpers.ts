@@ -13,6 +13,7 @@ import {
 
 import { prisma } from "../../db";
 import { isValid, parseISO } from "date-fns";
+import { evaluateMinutaStatus as evaluateMinutaStatusDomain } from "../minutas/domain/evaluate-minuta-status";
 
 import type { ListTareasQuery } from "./zod";
 
@@ -44,31 +45,10 @@ export const registrarCambio = async (
 // MINUTAS
 // ─────────────────────────────────────────────────────────────
 
-export const evaluarEstadoMinuta = async (minutaId: number): Promise<void> => {
-  const minuta = await prisma.minuta.findUnique({
-    where: { id: minutaId },
-    select: { estado: true, cerradoPorId: true },
-  });
-
-  if (!minuta || minuta.cerradoPorId != null) return;
-
-  const tareas = await prisma.tarea.findMany({
-    where: { minutaId },
-    select: { estado: true },
-  });
-
-  if (tareas.length === 0) return;
-
-  const todasCerradasOCanceladas = tareas.every(
-    (t) => t.estado === EstadoTarea.CERRADA || t.estado === EstadoTarea.CANCELADA || t.estado === null
-  );
-
-  await prisma.minuta.update({
-    where: { id: minutaId },
-    data: {
-      estado: todasCerradasOCanceladas ? EstadoMinuta.CERRADA : EstadoMinuta.ACTIVA,
-    },
-  });
+export const evaluarEstadoMinuta = async (minutaId: number, userId?: number): Promise<void> => {
+  // Call the new domain service
+  // userId might be undefined (e.g. from a cron job), so we pass 0 or a system identifier
+  await evaluateMinutaStatusDomain(minutaId, userId || 0);
 };
 
 // ─────────────────────────────────────────────────────────────

@@ -76,23 +76,23 @@ export const createTareaNotaSchema = z.object({
 
 const singleTareaSchema = z.object({
   descripcion: z.string().min(3, "La descripción es requerida"),
-  minutaId: z.preprocess(pre, z.coerce.number().int().positive().optional()),
+  minutaId: z.preprocess(pre, z.coerce.number().int().positive().nullable().optional()),
 
   // Captura rápida
   area: z.preprocess(pre, z.nativeEnum(Area).default(Area.DISENO)),
-  linea: z.preprocess(pre, z.string().optional()),
-  clasificacion: z.preprocess(pre, z.string().optional()),
+  linea: z.preprocess(pre, z.string().nullable().optional()),
+  clasificacion: z.preprocess(pre, z.string().nullable().optional()),
 
   // Clasificación post-junta
-  tipo: z.preprocess(pre, z.nativeEnum(TipoEntrada).optional()),
-  estado: z.preprocess(pre, z.nativeEnum(EstadoTarea).optional()),
-  alcanceRecordatorio: z.preprocess(pre, z.nativeEnum(AlcanceRecordatorio).optional()),
+  tipo: z.preprocess(pre, z.nativeEnum(TipoEntrada).nullable().optional()),
+  estado: z.preprocess(pre, z.nativeEnum(EstadoTarea).nullable().optional()),
+  alcanceRecordatorio: z.preprocess(pre, z.nativeEnum(AlcanceRecordatorio).nullable().optional()),
 
   // Formalización
-  prioridad: z.preprocess(pre, z.nativeEnum(Prioridad).optional()),
+  prioridad: z.preprocess(pre, z.nativeEnum(Prioridad).nullable().optional()),
   fechaVencimiento: z.preprocess(
     pre,
-    z.coerce.date({ message: "Fecha de vencimiento inválida" }).optional()
+    z.coerce.date({ message: "Fecha de vencimiento inválida" }).nullable().optional()
   ),
 
   responsables: responsablesField,

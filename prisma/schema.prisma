@@ -64,6 +64,8 @@ enum EstadoTarea {
 
 enum EstadoMinuta {
   PROGRAMADA
+  EN_CURSO
+  EN_ORGANIZACION
   ACTIVA
   CERRADA
   CANCELADA

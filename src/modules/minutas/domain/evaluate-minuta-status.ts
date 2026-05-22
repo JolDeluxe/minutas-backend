@@ -1,0 +1,75 @@
+import { EstadoMinuta, EstadoTarea, TipoEntrada } from "@prisma/client";
+import { prisma } from "../../../db";
+import { transitionMinutaStatus } from "./minuta-transitions";
+
+/**
+ * Service to evaluate the true status of a Minuta based on its entries.
+ * Evaluates rules:
+ * - If there are unorganized entries -> EN_ORGANIZACION
+ * - If all organized, but there are active tasks -> ACTIVA
+ * - If all organized and no active tasks -> CERRADA
+ */
+export const evaluateMinutaStatus = async (
+  minutaId: number,
+  triggeredByUserId: number
+): Promise<void> => {
+  const minuta = await prisma.minuta.findUnique({
+    where: { id: minutaId },
+    select: { estado: true, cerradoPorId: true },
+  });
+
+  if (!minuta) return;
+
+  const { estado } = minuta;
+
+  // Solo el evaluador opera sobre minutas que ya pasaron la sesión viva (EN_CURSO)
+  // No evaluamos PROGRAMADA, CANCELADA ni EN_CURSO automáticamente porque dependen de acciones manuales directas
+  if (
+    estado === EstadoMinuta.PROGRAMADA ||
+    estado === EstadoMinuta.EN_CURSO ||
+    estado === EstadoMinuta.CANCELADA
+  ) {
+    return;
+  }
+
+  const entradas = await prisma.tarea.findMany({
+    where: { minutaId },
+    select: { tipo: true, estado: true },
+  });
+
+  if (entradas.length === 0) {
+    // Si no tiene entradas y estaba en organizacion o activa, se puede cerrar directo
+    if (estado !== EstadoMinuta.CERRADA) {
+      await transitionMinutaStatus(minutaId, EstadoMinuta.CERRADA, triggeredByUserId);
+    }
+    return;
+  }
+
+  const hasUnorganizedEntries = entradas.some((e) => e.tipo === TipoEntrada.SIN_ORGANIZAR);
+  
+  // Consideramos seguimiento activo a cualquier entrada (principalmente TAREAS) que tenga estado PENDIENTE o EN_REVISION.
+  const hasActiveTracking = entradas.some(
+    (e) =>
+      (e.tipo === TipoEntrada.TAREA || e.estado != null) &&
+      e.estado !== EstadoTarea.CERRADA &&
+      e.estado !== EstadoTarea.CANCELADA
+  );
+
+  let targetState: EstadoMinuta = estado;
+
+  if (hasUnorganizedEntries) {
+    targetState = EstadoMinuta.EN_ORGANIZACION;
+  } else if (hasActiveTracking) {
+    targetState = EstadoMinuta.ACTIVA;
+  } else {
+    targetState = EstadoMinuta.CERRADA;
+  }
+
+  if (targetState !== estado) {
+    try {
+      await transitionMinutaStatus(minutaId, targetState, triggeredByUserId);
+    } catch (error) {
+      console.error(`Error auto-evaluating minuta status for ID ${minutaId}:`, error);
+    }
+  }
+};

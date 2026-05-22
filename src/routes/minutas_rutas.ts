@@ -9,6 +9,8 @@ import { cerrarMinuta } from "../modules/minutas/04_close";
 import { compararConAnterior } from "../modules/minutas/05_compare";
 import { iniciarMinuta } from "../modules/minutas/06_start";
 import { cancelarMinuta } from "../modules/minutas/07_cancel";
+import { reabrirMinuta } from "../modules/minutas/08_reopen";
+import { finalizarMinuta } from "../modules/minutas/09_finish";
 
 const router = Router();
 router.use(authenticate);
@@ -27,5 +29,9 @@ router.patch("/:id/cerrar", validate(minutaIdSchema),    cerrarMinuta);
 router.post("/:id/iniciar", validate(minutaIdSchema),    iniciarMinuta);
 // POST /api/minutas/:id/cancelar
 router.post("/:id/cancelar", validate(minutaIdSchema),   cancelarMinuta);
+// PATCH /api/minutas/:id/reabrir
+router.patch("/:id/reabrir", validate(minutaIdSchema),   reabrirMinuta);
+// POST /api/minutas/:id/finalizar
+router.post("/:id/finalizar", validate(minutaIdSchema),  finalizarMinuta);
 
 export default router;
