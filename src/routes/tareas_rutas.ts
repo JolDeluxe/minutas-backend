@@ -53,8 +53,8 @@ router.patch("/:id/organizar", validate(organizarTareaSchema), organizarTarea);
 router.patch("/:id/estado", validate(changeEstadoSchema), changeEstadoTarea);
 
 /**
- * Ruta Crítica: Eliminación Física
- * El middleware de validación usa deleteTareaSchema para asegurar tipos numéricos.
+ * Ruta Crítica: Eliminación Lógica (Soft Delete)
+ * Cambia el estado de la tarea a CANCELADA y borra sus imágenes de Cloudinary.
  */
 router.delete("/:id", validate(deleteTareaSchema), deleteTarea);
 

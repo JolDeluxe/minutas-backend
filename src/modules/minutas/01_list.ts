@@ -14,7 +14,8 @@ export const listarMinutas = async (req: Request, res: Response) => {
 
     const where = buildMinutasWhere(query, req.user);
 
-    const formattedSort = (sort || []).map((item: any) => {
+    const parsedSort = sort || [];
+    const formattedSort = parsedSort.map((item: any) => {
       const newItem: any = {};
       for (const [key, value] of Object.entries(item)) {
         if (key === "fecha") {
@@ -32,7 +33,7 @@ export const listarMinutas = async (req: Request, res: Response) => {
         where,
         take:    limit,
         skip:    offset,
-        orderBy: formattedSort as Prisma.MinutaOrderByWithRelationInput[],
+        orderBy: formattedSort as Prisma.MinutaOrderByWithRelationInput[], // 👈 Ahora 100% seguro de que es un Array
         include: {
           creadoPor: {
             select: USUARIO_SELECT_BASICO,
@@ -119,9 +120,9 @@ export const listarMinutas = async (req: Request, res: Response) => {
         isJuntaActual: m.departamento === 'DISENO' ? m.id === ultimaJuntaId.DISENO : m.id === ultimaJuntaId.MARKETING,
         isJuntaAnterior: m.departamento === 'DISENO' ? m.id === juntaAnteriorId.DISENO : m.id === juntaAnteriorId.MARKETING,
         resumenOperativo: {
-          totalEntradas, // Count of all entries (including reminders, unorganized, etc)
+          totalEntradas,
           completadas,
-          enProgreso: 0, // Legacy support
+          enProgreso: 0,
           pendientes,
           atrasadas,
           cerradas,

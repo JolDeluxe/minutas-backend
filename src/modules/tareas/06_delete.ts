@@ -1,95 +1,97 @@
 import type { Request, Response } from "express";
 import { prisma } from "../../db";
-import { Rol } from "@prisma/client";
+import { Rol, EstadoTarea, EstadoMinuta } from "@prisma/client";
 import { registrarAccion, registrarError } from "../../utils/logger";
 import { deleteImageByPublicId } from "../../utils/cloudinary";
-import { evaluarEstadoMinuta } from "./helpers";
 import type { DeleteTareaParams } from "./zod";
 
-export const deleteTarea = async (
-  req: Request,
-  res: Response
-) => {
+/**
+ * Eliminación Lógica de una Tarea/Entrada.
+ * Cambia el estado a CANCELADA y borra las imágenes de Cloudinary en segundo plano.
+ */
+export const deleteTarea = async (req: Request, res: Response) => {
   try {
     const usuarioId = req.user!.id;
-    const rolUsuario = req.user!.rol;
+    const { id } = req.params as unknown as DeleteTareaParams;
 
-    const { id } =
-      req.params as unknown as DeleteTareaParams;
-
-    const rolesPermitidos: Rol[] = [
-      Rol.GERENCIA,
-      Rol.JEFE,
-    ];
-
-    if (!rolesPermitidos.includes(rolUsuario)) {
-      return res.status(403).json({
-        error:
-          "No tienes permisos para eliminar registros físicamente",
-      });
-    }
-
+    // 1. Buscar la tarea y sus imágenes
     const tarea = await prisma.tarea.findUnique({
       where: { id },
-
       include: {
-        imagenes: true,
+        imagenes: {
+          select: {
+            publicId: true,
+          },
+        },
+        minuta: {
+          select: {
+            estado: true,
+          },
+        },
       },
     });
 
     if (!tarea) {
-      return res.status(404).json({
-        error: "Entrada no encontrada",
+      return res.status(404).json({ error: "Entrada no encontrada" });
+    }
+
+    // 2. Validar permisos
+    const esCreador = tarea.creadoPorId === usuarioId;
+    const esAdmin = req.user!.rol === Rol.ADMIN || req.user!.rol === Rol.GERENCIA;
+    const minutaCerrada =
+      tarea.minuta?.estado === EstadoMinuta.CERRADA ||
+      tarea.minuta?.estado === EstadoMinuta.CANCELADA;
+
+    if (minutaCerrada && !esAdmin) {
+      return res.status(403).json({
+        error: "No puedes descartar entradas de una minuta que ya fue cerrada.",
       });
     }
 
-    // Eliminar imágenes de Cloudinary en paralelo con tolerancia a fallos
-    if (tarea.imagenes.length > 0) {
-      const results = await Promise.allSettled(
-        tarea.imagenes.map((img) =>
-          deleteImageByPublicId(img.publicId)
-        )
-      );
-
-      for (const result of results) {
-        if (result.status === "rejected") {
-          console.error(
-            "Error eliminando imagen de Cloudinary:",
-            result.reason
-          );
-        }
-      }
+    if (!esCreador && !esAdmin) {
+      return res.status(403).json({
+        error: "No tienes permisos para descartar esta entrada.",
+      });
     }
 
-    await prisma.tarea.delete({
+    // 3. Realizar la actualización de estado (Soft Delete)
+    // Si la entrada ya estaba formalizada como TAREA, la pasamos a CANCELADA.
+    // Si no, la pasamos a tipo DESCARTADA.
+    const isTareaFormalizada = tarea.tipo === TipoEntrada.TAREA;
+
+    await prisma.tarea.update({
       where: { id },
+      data: {
+        ...(isTareaFormalizada ? { estado: EstadoTarea.CANCELADA } : { tipo: TipoEntrada.DESCARTADA, estado: null }),
+        cerradoAt: new Date(),
+      },
     });
 
-    await registrarAccion(
-      "DELETE_TAREA",
-      usuarioId,
-      `Entrada organizacional eliminada ID ${id}`
-    );
+    // 4. Responder inmediatamente a la UI
+    res.status(200).json({ message: "Entrada descartada correctamente." });
 
-    if (tarea.minutaId) {
-      await evaluarEstadoMinuta(tarea.minutaId, usuarioId);
-    }
-
-    return res.json({
-      status: "success",
-      message:
-        "Entrada eliminada correctamente",
+    // 5. Registrar en bitácora en segundo plano (NO eliminamos imágenes porque es un soft delete)
+    process.nextTick(async () => {
+      try {
+        await registrarAccion(
+          "DESCARTAR_TAREA",
+          usuarioId,
+          `Entrada organizacional descartada ID ${id}`
+        );
+      } catch (backgroundError) {
+        await registrarError(
+          "DELETE_TAREA_BACKGROUND",
+          usuarioId,
+          backgroundError
+        );
+      }
     });
+
   } catch (error) {
-    await registrarError(
-      "DELETE_TAREA",
-      req.user?.id ?? null,
-      error
-    );
-
-    return res.status(500).json({
-      error:
-        "Error al eliminar la entrada",
-    });
+    await registrarError("DELETE_TAREA", req.user?.id ?? null, error);
+    // No enviar una respuesta aquí si ya se envió una
+    if (!res.headersSent) {
+      return res.status(500).json({ error: "Error al descartar la entrada" });
+    }
   }
 };

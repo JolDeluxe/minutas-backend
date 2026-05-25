@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { EstadoMinuta } from "@prisma/client";
+
 const estadoValues = Object.values(EstadoMinuta) as [string, ...string[]];
 
 const pre = (val: unknown): unknown =>
@@ -58,11 +59,13 @@ export const listMinutasSchema = z.object({
     page:  z.coerce.number().min(1).default(1),
     limit: z.coerce.number().min(1).max(100).default(20),
 
-    // Ordenamiento
+    // Ordenamiento (Parseo y transformación automatizada de "fecha" -> "fechaProgramada")
     sort: z.preprocess(
       (val) => {
-        if (typeof val === "string") { try { return JSON.parse(val); } catch { return []; } }
-        return val ?? [];
+        if (typeof val === "string") { 
+          try { return JSON.parse(val); } catch { return undefined; } 
+        }
+        return val;
       },
       z
         .array(
@@ -76,8 +79,18 @@ export const listMinutasSchema = z.object({
             })
             .strict()
         )
-        .default([{ fecha: "desc" }])
-    ),
+        .optional()
+    ).transform((arr) => {
+      if (!arr) return undefined;
+      // Remapea estructuralmente la propiedad para que coincida con el nuevo esquema de la base de datos
+      return arr.map((item) => {
+        const { fecha, ...rest } = item;
+        if (fecha) {
+          return { ...rest, fechaProgramada: fecha };
+        }
+        return item;
+      });
+    }),
   }),
 });
 

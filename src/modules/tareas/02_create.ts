@@ -35,6 +35,7 @@ export const crearTarea = async (
   try {
     const usuarioId = req.user!.id;
 
+    console.log(`[crearTarea] Payload recibido (body):`, JSON.stringify(req.body, null, 2));
     const tareasPayload = req.body.tareas as CreateTareaInput[];
 
     // ── Validar TODAS las minutas referenciadas ──────────────
@@ -83,40 +84,33 @@ export const crearTarea = async (
 
       const fechaVenc = normalizarFechaVencimiento(tareaInput.fechaVencimiento);
 
-      // Búsqueda Inteligente de Archivos
+      // Búsqueda de archivos simplificada y robusta
+      const fieldNamePrefix = `files_${index}_`;
       let archivosDeEstaTarea = files
-        ? files.filter((f) => f.fieldname.includes(`_tarea_${index}_`) || f.fieldname.includes(`_${index}_`))
+        ? files.filter((f) => f.fieldname.startsWith(fieldNamePrefix))
         : [];
 
-      // Fallback
-      if (archivosDeEstaTarea.length === 0 && files && files.length > 0) {
-          if (tareasPayload.length === 1) {
-              archivosDeEstaTarea = files.slice(0, 3);
-          } else {
-              const skip = index * 3;
-              archivosDeEstaTarea = files.slice(skip, skip + 3);
-          }
+      console.log(`[crearTarea] Tarea #${index}: Buscando con prefijo "${fieldNamePrefix}". Encontrados: ${archivosDeEstaTarea.length} archivos.`);
+
+      // Fallback por si la nomenclatura falla (no debería con el nuevo frontend)
+      if (archivosDeEstaTarea.length === 0 && files && files.length > 0 && tareasPayload.length === 1) {
+          console.warn(`[crearTarea] Tarea #${index}: No se encontraron archivos por prefijo, aplicando fallback para única tarea.`);
+          archivosDeEstaTarea = files.slice(0, 3);
       }
 
       // ── Upload paralelo de imágenes ───────────────────────
       const imagenesData = await Promise.all(
         (archivosDeEstaTarea || []).slice(0, 3).map(async (file, i) => {
-          try {
-            const { url, publicId } = await uploadTaskImage(
-              file.buffer,
-              file.mimetype
-            );
-            console.log(
-              `[crearTarea] imagen subida OK: ${file.fieldname} → ${url}`
-            );
-            return { url, publicId, orden: i + 1 };
-          } catch (err) {
-            console.error(
-              `[Cloudinary Error] Tarea ${index} Imagen ${i} (${file.mimetype}):`,
-              err
-            );
-            return null;
-          }
+          // NOTA: El try/catch ahora está fuera del Promise.all
+          // Si una imagen falla, todo el bloque de creación de tareas fallará.
+          const { url, publicId } = await uploadTaskImage(
+            file.buffer,
+            file.mimetype
+          );
+          console.log(
+            `[crearTarea] imagen subida OK: ${file.fieldname} → ${url}`
+          );
+          return { url, publicId, orden: i + 1 };
         })
       );
 

@@ -1,10 +1,17 @@
 import { v2 as cloudinary } from "cloudinary";
 import { env } from "../env";
 
+// --- DIAGNÓSTICO DE CREDENCIALES ---
+console.log(`[Cloudinary Config] Cloud Name: ${env.CLOUDINARY_CLOUD_NAME ? 'OK' : '¡NO ENCONTRADO!'}`);
+console.log(`[Cloudinary Config] API Key: ${env.CLOUDINARY_API_KEY ? 'OK' : '¡NO ENCONTRADO!'}`);
+console.log(`[Cloudinary Config] API Secret: ${env.CLOUDINARY_API_SECRET ? 'OK' : '¡NO ENCONTRADO!'}`);
+// ------------------------------------
+
 cloudinary.config({
   cloud_name: env.CLOUDINARY_CLOUD_NAME,
   api_key: env.CLOUDINARY_API_KEY,
   api_secret: env.CLOUDINARY_API_SECRET,
+  secure: true, // Forzar URLs HTTPS
 });
 
 // --- FUNCIÓN RECUPERADA: Para las fotos de perfil de usuario ---
@@ -32,22 +39,25 @@ export const uploadTaskImage = async (
   mimetype: string = "image/jpeg"
 ): Promise<{ url: string; publicId: string }> => {
   return new Promise((resolve, reject) => {
+    console.log(`[Cloudinary] Iniciando upload_stream, tamaño buffer: ${buffer.length} bytes`);
     const uploadStream = cloudinary.uploader.upload_stream(
       {
         folder: "minutas-diseño/imagenes",
         resource_type: "image",
         transformation: [
           { width: 1280, crop: "limit" },
-          { quality: "auto:good" },
+          { quality: "auto:eco" }, // Mayor compresión para rendimiento móvil
           { fetch_format: "auto" },
         ],
       },
       (error, result) => {
         if (error || !result) {
+          console.error(`[Cloudinary] Error en upload_stream:`, error);
           return reject(
             error ?? new Error("Cloudinary upload_stream: sin resultado")
           );
         }
+        console.log(`[Cloudinary] Upload exitoso: ${result.secure_url}`);
         resolve({ url: result.secure_url, publicId: result.public_id });
       }
     );

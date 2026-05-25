@@ -37,6 +37,8 @@ export const listarUsuarios = async (req: Request, res: Response) => {
     delete querySinRol.rol;
     const whereSinRol = buildUsuariosWhere(querySinRol, securityFilter);
 
+    const orderBy = (sort || []) as Prisma.UsuarioOrderByWithRelationInput[];
+
     const [total, totalAbsoluto, resumenRoles, usuarios] = await Promise.all([
       prisma.usuario.count({ where }),
       prisma.usuario.count({ where: whereSinRol }),
@@ -50,7 +52,7 @@ export const listarUsuarios = async (req: Request, res: Response) => {
         take:    limit,
         skip:    offset,
         select:  sharedSelect,
-        orderBy: sort as Prisma.UsuarioOrderByWithRelationInput[],
+        orderBy,
       }),
     ]);
 

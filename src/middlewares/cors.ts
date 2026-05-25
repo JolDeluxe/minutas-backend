@@ -2,11 +2,13 @@ import cors from "cors";
 import { env } from "../env";
 
 const whitelist = [
-  "http://localhost:5173",
-  "http://localhost:5174",
-  "http://localhost:3000",
-  // Agregar dominio de producción cuando esté definido
-];
+   "http://localhost:5173",
+   "http://localhost:5174",
+   "http://localhost:3000",
+   "http://localhost:5000", // Añadido por si acaso
+   "http://192.168.137.1:5000", // Añadido para tu red
+   "http://200.1.0.72:5000", // Añadido para tu red
+   ];
 
 const corsOptions: cors.CorsOptions = {
   origin: (origin, callback) => {

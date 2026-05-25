@@ -60,6 +60,7 @@ enum EstadoTarea {
   EN_REVISION
   CERRADA
   CANCELADA
+  DESCARTADA
 }
 
 enum EstadoMinuta {

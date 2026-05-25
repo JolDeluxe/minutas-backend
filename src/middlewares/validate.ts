@@ -1,80 +1,68 @@
 import { type Request, type Response, type NextFunction } from "express";
-import { type ZodSchema, ZodError } from "zod";
+import { ZodError, type ZodTypeAny } from "zod";
 
 /**
- * Middleware de validación centralizado para el ecosistema CUADRA.
- * Blindado para soportar JSON y FormData (Multipart).
+ * Middleware de validación centralizado e inteligente para Express, compatible con Bun.
+ * Valida selectivamente las partes de la petición (body, query, params) y utiliza 
+ * Object.defineProperty para sobreescribir las propiedades que puedan ser de solo lectura.
  */
-export const validate = (schema: ZodSchema) => async (req: Request, res: Response, next: NextFunction) => {
+export const validate = (schema: any) => (req: Request, res: Response, next: NextFunction) => {
   try {
-    // 1. LIMPIEZA PRE-VALIDACIÓN (Especial para FormData)
-    // Cuando el frontend envía FormData, Multer inyecta strings en req.body.
-    // Convertimos "null", "undefined" o "" en null real para que Zod pueda validarlos.
-    const cleanBody = req.body ? Object.fromEntries(
-      Object.entries(req.body).map(([key, value]) => [
-        key, 
-        value === "" || value === "null" || value === "undefined" ? null : value
-      ])
-    ) : req.body;
+    const internalSchema = schema as any;
 
-    // 2. PROCESAMIENTO CON ZOD
-    // Parseamos body, query y params simultáneamente.
-    // Zod aplicará coerce, default y preprocess definidos en el módulo.
-    const validatedData = await schema.parseAsync({
-      body: cleanBody,
-      query: req.query,
-      params: req.params,
-    }) as Record<string, any>;
-
-    // 3. REASIGNACIÓN BLINDADA (Shadowing)
-    // Matamos los getters nativos de Express para evitar que los datos originales
-    // (sucios) se filtren a los controladores.
-    if (validatedData.body !== undefined) {
-      Object.defineProperty(req, "body", {
-        value: validatedData.body,
+    // Validar 'body' solo si el esquema lo define
+    if (internalSchema.shape?.body) {
+      const parsedBody = internalSchema.shape.body.parse(req.body);
+      Object.defineProperty(req, 'body', {
+        value: parsedBody,
         writable: true,
-        enumerable: true,
         configurable: true,
+        enumerable: true
       });
     }
 
-    if (validatedData.query !== undefined) {
-      Object.defineProperty(req, "query", {
-        value: validatedData.query,
+    // Validar 'query' solo si el esquema lo define
+    if (internalSchema.shape?.query) {
+      const parsedQuery = internalSchema.shape.query.parse(req.query);
+      // IMPORTANTE: En entornos como Bun/Express, req.query puede ser readonly.
+      // Usamos defineProperty para forzar la inyección de los tipos correctos (Int, Arrays, etc).
+      Object.defineProperty(req, 'query', {
+        value: parsedQuery,
         writable: true,
-        enumerable: true,
         configurable: true,
+        enumerable: true
       });
     }
 
-    if (validatedData.params !== undefined) {
-      Object.defineProperty(req, "params", {
-        value: validatedData.params,
+    // Validar 'params' solo si el esquema lo define
+    if (internalSchema.shape?.params) {
+      const parsedParams = internalSchema.shape.params.parse(req.params);
+      Object.defineProperty(req, 'params', {
+        value: parsedParams,
         writable: true,
-        enumerable: true,
         configurable: true,
+        enumerable: true
       });
     }
 
     return next();
   } catch (error: any) {
-    // 4. MANEJO UNIFORME DE ERRORES DE VALIDACIÓN
-    // Soporta duck typing para compatibilidad total con el runtime Bun.
-    if (error instanceof ZodError || error?.name === "ZodError") {
+    if (error instanceof ZodError) {
+      console.log("❌ Error de Validación Zod:", JSON.stringify(error.format(), null, 2));
       return res.status(400).json({
         status: "error",
         message: "Datos de entrada inválidos",
         errors: error.issues.map((issue: any) => ({
-          field: issue.path.join("."), 
+          field: issue.path.join("."),
           message: issue.message,
         })),
       });
     }
-    
-    // Fallback para errores imprevistos del sistema
+
+    // Fallback para errores inesperados
     console.error("🔥 Error Crítico en Middleware de Validación:", error);
-    return res.status(500).json({ 
-      error: "Error interno durante la validación de la solicitud" 
+    return res.status(500).json({
+      error: "Error interno durante la validación de la solicitud",
     });
   }
 };
