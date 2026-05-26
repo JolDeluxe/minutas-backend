@@ -1,4 +1,4 @@
-import { listMinutasSchema } from './src/modules/minutas/zod';
+import { listMinutasSchema } from '../modules/minutas/zod';
 
 const q1 = {
   page: '1', limit: '10', sort: '[{"createdAt":"desc"}]', lineaDefault: 'CUADRA'

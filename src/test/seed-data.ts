@@ -28,7 +28,7 @@ const CATALOGOS = {
     clasificaciones: ["IDEA", "INVESTIGACION", "CORRECCION", "ANALISIS", "MUESTRA", "POLITICAS", "OTROS"]
   },
   MARKETING: {
-    lineas: ["CAMPANA", "TIENDAS", "DIGITAL", "OTROS"],
+    lineas: ["MARKETING", "TIENDAS", "DIGITAL", "OTROS"],
     clasificaciones: ["REDES_SOCIALES", "DISENO_INSUMOS", "TIENDAS", "CATALOGOS", "OTROS"]
   }
 };
