@@ -201,6 +201,7 @@ export const listTareasSchema = z.object({
     creadoPorId: z.preprocess(pre, z.coerce.number().int().positive().optional()),
     responsableId: z.preprocess(pre, z.coerce.number().int().positive().optional()),
     organizadoPorId: z.preprocess(pre, z.coerce.number().int().positive().optional()),
+    departamento: z.preprocess(pre, z.enum(["DISENO", "MARKETING"]).optional()),
     
     isExternalArea: z.preprocess(parseBool, z.boolean().optional()),
     atrasadas: z.preprocess(parseBool, z.boolean().optional()),

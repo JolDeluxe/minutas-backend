@@ -35,7 +35,7 @@ export const changeEstadoTarea = async (req: Request, res: Response) => {
       return res.status(400).json({ error: "Solo las entradas clasificadas como TAREA tienen flujo de estados" });
     }
 
-    const esJefeOGerente = [Rol.GERENCIA as string, Rol.JEFE as string].includes(rolUsuario);
+    const esJefeOGerente = [Rol.GERENCIA as string, Rol.JEFE as string, Rol.ADMIN as string].includes(rolUsuario);
 
     // ── LÓGICA DE TRANSICIONES ──────────────────────────────────
     if (!esJefeOGerente) {

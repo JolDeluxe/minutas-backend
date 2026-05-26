@@ -52,7 +52,7 @@ export const listTareas = async (
             organizadoPor: { select: { id: true, nombre: true } },
             notas: {
               orderBy: { createdAt: "desc" },
-              include: { creadoPor: { select: { id: true, nombre: true } } },
+              include: { creadoPor: { select: { id: true, nombre: true, imagen: true } } },
             },
           },
         }),

@@ -66,11 +66,13 @@ export const buildTareasWhere = (
 ): Prisma.TareaWhereInput => {
   const where: Prisma.TareaWhereInput = {};
 
-  if (usuario.rol !== Rol.ADMIN && usuario.departamento) {
+  if (usuario.rol !== Rol.ADMIN && usuario.rol !== Rol.COORDINADOR && usuario.departamento) {
     where.departamento = usuario.departamento;
+  } else if (usuario.rol === Rol.ADMIN && (query as any).departamento) {
+    where.departamento = (query as any).departamento;
   }
 
-  if (usuario.rol !== Rol.ADMIN && usuario.rol !== Rol.GERENCIA && usuario.linea) {
+  if (usuario.rol !== Rol.ADMIN && usuario.rol !== Rol.GERENCIA && usuario.rol !== Rol.COORDINADOR && usuario.linea) {
     where.linea = usuario.linea;
   }
 
@@ -174,7 +176,9 @@ export const buildTareasWhere = (
           },
           {
               tipo: TipoEntrada.RECORDATORIO,
-              alcanceRecordatorio: AlcanceRecordatorio.DEPARTAMENTO
+              alcanceRecordatorio: AlcanceRecordatorio.DEPARTAMENTO,
+              departamento: usuario.departamento ?? undefined,
+              linea: usuario.linea ?? undefined
           }
       ];
   } else if (query.responsableId != null) {

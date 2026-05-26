@@ -56,6 +56,15 @@ export const getTareaById = async (
           orderBy: {
             createdAt: "desc",
           },
+          include: {
+            creadoPor: {
+              select: {
+                id: true,
+                nombre: true,
+                imagen: true,
+              },
+            },
+          },
         },
 
         historial: {
