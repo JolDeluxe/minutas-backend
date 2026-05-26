@@ -70,10 +70,9 @@ export const uploadPdfDocument = async (buffer: Buffer, filename: string): Promi
   return new Promise((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(
       {
-        folder: "minutas-diseño/pdf", // <-- Carpeta segmentada
-        resource_type: "image", // "image" permite previsualizar PDFs en el navegador
+        folder: "minutas-diseño/pdf",
+        resource_type: "raw", // Usamos raw para PDFs u otros binarios
         public_id: filename,
-        format: "pdf"
       },
       (error, result) => {
         if (error || !result) reject(error);

@@ -39,9 +39,12 @@ export const evaluateMinutaStatus = async (
 
   // Filtrar solo entradas internas (las externas no bloquean la minuta)
   const entradasInternas = entradas.filter((e) => {
-    const isExterna = (departamento === 'DISENO' && e.area === 'MARKETING') ||
-                      (departamento === 'MARKETING' && e.area === 'DISENO');
-    return !isExterna;
+    // Si no tiene area, se considera interna (pendiente de clasificar)
+    if (!e.area) return true;
+    
+    // Si tiene area, comparamos con el departamento de la minuta
+    // Solo es interna si el area coincide exactamente con el departamento
+    return (e.area as string) === (departamento as string);
   });
 
   if (entradasInternas.length === 0) {

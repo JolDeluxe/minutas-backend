@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 import { prisma } from "../../db";
-import { Rol, EstadoTarea, EstadoMinuta } from "@prisma/client";
+import { Rol, EstadoTarea, EstadoMinuta, TipoEntrada } from "@prisma/client";
 import { registrarAccion, registrarError } from "../../utils/logger";
 import { deleteImageByPublicId } from "../../utils/cloudinary";
 import type { DeleteTareaParams } from "./zod";

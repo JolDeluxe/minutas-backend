@@ -1,233 +1,145 @@
-import type {
-  Request,
-  Response,
-} from "express";
-
+import type { Request, Response } from "express";
 import PDFDocument from "pdfkit";
-
 import { prisma } from "../../db";
+import { registrarError } from "../../utils/logger";
+import { uploadPdfDocument } from "../../utils/cloudinary";
+import type { TareaIdParams } from "./zod";
 
-import {
-  registrarError,
-} from "../../utils/logger";
-
-import {
-  uploadPdfDocument,
-} from "../../utils/cloudinary";
-
-import type {
-  TareaIdParams,
-} from "./zod";
-
-export const generarPdfTarea = async (
-  req: Request,
-  res: Response
-) => {
+export const generarPdfTarea = async (req: Request, res: Response) => {
   try {
-    const { id } =
-      req.params as unknown as TareaIdParams;
+    const { id } = req.params as unknown as TareaIdParams;
 
-    const tarea =
-      await prisma.tarea.findUnique({
-        where: { id },
-
-        include: {
-          creadoPor: {
-            select: {
-              nombre: true,
-            },
-          },
-
-          minuta: {
-            select: {
-              titulo: true,
-            },
-          },
-
-          asignaciones: {
-            include: {
-              usuario: {
-                select: {
-                  nombre: true,
-                },
-              },
-            },
-          },
-        },
-      });
+    const tarea = await prisma.tarea.findUnique({
+      where: { id },
+      include: {
+        creadoPor: { select: { nombre: true } },
+        minuta: { select: { titulo: true, fechaRealizada: true, fechaProgramada: true } },
+        asignaciones: { include: { usuario: { select: { nombre: true } } } },
+        imagenes: true
+      },
+    });
 
     if (!tarea) {
-      return res.status(404).json({
-        error: "Entrada no encontrada",
-      });
+      return res.status(404).json({ error: "Entrada no encontrada" });
     }
 
-    const pdfUrl =
-      await new Promise<string>(
-        (resolve, reject) => {
-          const doc =
-            new PDFDocument({
-              margin: 50,
-            });
+    const pdfUrl = await new Promise<string>((resolve, reject) => {
+      const doc = new PDFDocument({ margin: 50, size: 'LETTER' });
+      const buffers: Buffer[] = [];
 
-          const buffers: Buffer[] = [];
-
-          doc.on(
-            "data",
-            buffers.push.bind(buffers)
-          );
-
-          doc.on(
-            "end",
-            async () => {
-              const pdfBuffer =
-                Buffer.concat(buffers);
-
-              try {
-                const filename =
-                  `Entrada_${tarea.id}`;
-
-                const url =
-                  await uploadPdfDocument(
-                    pdfBuffer,
-                    filename
-                  );
-
-                resolve(url);
-              } catch (error) {
-                reject(error);
-              }
-            }
-          );
-
-          doc
-            .fontSize(22)
-            .font("Helvetica-Bold")
-            .text(
-              "Entrada Organizacional",
-              {
-                align: "center",
-              }
-            );
-
-          doc.moveDown(1);
-
-          doc
-            .fontSize(12)
-            .font("Helvetica");
-
-          doc.text(`ID: #${tarea.id}`);
-
-          doc.text(
-            `Clasificación: ${
-              tarea.clasificacion ??
-              "No especificada"
-            }`
-          );
-
-          doc.text(
-            `Área: ${tarea.area}`
-          );
-
-          doc.text(
-            `Línea: ${
-              tarea.linea ??
-              "No especificada"
-            }`
-          );
-
-          doc.text(
-            `Tipo: ${tarea.tipo}`
-          );
-
-          doc.text(
-            `Estado: ${
-              tarea.estado ??
-              "No aplica"
-            }`
-          );
-
-          doc.text(
-            `Prioridad: ${
-              tarea.prioridad ??
-              "No especificada"
-            }`
-          );
-
-          if (tarea.minuta) {
-            doc.text(
-              `Minuta: ${tarea.minuta.titulo}`
-            );
-          }
-
-          doc.moveDown(1);
-
-          doc
-            .font("Helvetica-Bold")
-            .text("Descripción:");
-
-          doc.moveDown(0.5);
-
-          doc
-            .font("Helvetica")
-            .text(
-              tarea.descripcion,
-              {
-                align: "justify",
-              }
-            );
-
-          if (
-            tarea.asignaciones.length > 0
-          ) {
-            doc.moveDown(1);
-
-            doc
-              .font("Helvetica-Bold")
-              .text("Responsables:");
-
-            doc.moveDown(0.5);
-
-            tarea.asignaciones.forEach(
-              (asig) => {
-                doc
-                  .font("Helvetica")
-                  .text(
-                    `• ${asig.usuario.nombre}`
-                  );
-              }
-            );
-          }
-
-          doc.end();
+      doc.on("data", buffers.push.bind(buffers));
+      doc.on("end", async () => {
+        const pdfBuffer = Buffer.concat(buffers);
+        try {
+          const filename = `Entrada_Externa_${tarea.id}`;
+          const url = await uploadPdfDocument(pdfBuffer, filename);
+          resolve(url);
+        } catch (error) {
+          reject(error);
         }
-      );
+      });
+
+      // Colors
+      const primaryColor = '#1e293b'; // slate-800
+      const secondaryColor = '#64748b'; // slate-500
+      const accentColor = '#8b5cf6'; // purple-500 (good for external)
+      const lightGray = '#f1f5f9';
+
+      // Header Background
+      doc.rect(0, 0, doc.page.width, 100).fill(primaryColor);
+
+      // Header Text
+      doc.fillColor('#ffffff')
+         .fontSize(24)
+         .font("Helvetica-Bold")
+         .text("TAREA EXTERNA", 50, 30);
+      
+      doc.fontSize(12)
+         .font("Helvetica")
+         .text(`ID: #${String(tarea.id).padStart(4, '0')}`, 50, 60);
+
+      const fecha = tarea.minuta?.fechaRealizada || tarea.minuta?.fechaProgramada || tarea.createdAt;
+      const fechaStr = new Date(fecha).toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' });
+      
+      doc.text(fechaStr, 0, 60, { align: 'right', width: doc.page.width - 50 });
+
+      // Move down below header
+      doc.moveDown(4);
+
+      // Area prominently displayed
+      doc.fillColor(accentColor)
+         .fontSize(16)
+         .font("Helvetica-Bold")
+         .text("ÁREA DESTINO:", 50, 130);
+      
+      doc.fillColor(primaryColor)
+         .fontSize(22)
+         .font("Helvetica-Bold")
+         .text(tarea.area, 50, 150);
+
+      // Divider
+      doc.moveTo(50, 185).lineTo(doc.page.width - 50, 185).lineWidth(2).strokeColor(lightGray).stroke();
+
+      // Details Section
+      let currentY = 205;
+      const leftColX = 50;
+      const rightColX = doc.page.width / 2;
+
+      doc.fillColor(secondaryColor).fontSize(10).font("Helvetica-Bold").text("CLASIFICACIÓN", leftColX, currentY);
+      doc.fillColor(primaryColor).fontSize(12).font("Helvetica").text(tarea.clasificacion || "No especificada", leftColX, currentY + 15);
+
+      doc.fillColor(secondaryColor).fontSize(10).font("Helvetica-Bold").text("LÍNEA", rightColX, currentY);
+      doc.fillColor(primaryColor).fontSize(12).font("Helvetica").text(tarea.linea || "No especificada", rightColX, currentY + 15);
+
+      currentY += 45;
+      
+      if (tarea.minuta) {
+        doc.fillColor(secondaryColor).fontSize(10).font("Helvetica-Bold").text("MINUTA DE ORIGEN", leftColX, currentY);
+        doc.fillColor(primaryColor).fontSize(12).font("Helvetica").text(tarea.minuta.titulo, leftColX, currentY + 15);
+        currentY += 45;
+      }
+
+      doc.fillColor(secondaryColor).fontSize(10).font("Helvetica-Bold").text("CREADO POR", leftColX, currentY);
+      doc.fillColor(primaryColor).fontSize(12).font("Helvetica").text(tarea.creadoPor.nombre, leftColX, currentY + 15);
+      
+      currentY += 45;
+
+      // Divider
+      doc.moveTo(50, currentY).lineTo(doc.page.width - 50, currentY).lineWidth(2).strokeColor(lightGray).stroke();
+      currentY += 20;
+
+      // Description
+      doc.fillColor(secondaryColor).fontSize(12).font("Helvetica-Bold").text("DESCRIPCIÓN:", leftColX, currentY);
+      currentY += 20;
+
+      doc.rect(leftColX, currentY, doc.page.width - 100, 150).fill(lightGray);
+      doc.fillColor(primaryColor)
+         .fontSize(12)
+         .font("Helvetica")
+         .text(tarea.descripcion, leftColX + 15, currentY + 15, {
+            width: doc.page.width - 130,
+            align: 'justify'
+         });
+
+      // Footer
+      doc.fontSize(10)
+         .fillColor(secondaryColor)
+         .text("Generado automáticamente por el Sistema de Minutas", 50, doc.page.height - 50, { align: 'center' });
+
+      doc.end();
+    });
 
     await prisma.tarea.update({
       where: { id },
-
-      data: {
-        pdfUrl,
-      },
+      data: { pdfUrl },
     });
 
     return res.json({
       status: "success",
-
-      data: {
-        pdfUrl,
-      },
+      data: { pdfUrl },
     });
   } catch (error) {
-    await registrarError(
-      "GENERAR_PDF_TAREA",
-      req.user?.id ?? null,
-      error
-    );
-
-    return res.status(500).json({
-      error:
-        "Error al generar PDF",
-    });
+    await registrarError("GENERAR_PDF_TAREA", req.user?.id ?? null, error);
+    return res.status(500).json({ error: "Error al generar PDF" });
   }
 };

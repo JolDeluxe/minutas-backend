@@ -11,6 +11,7 @@ import { iniciarMinuta } from "../modules/minutas/06_start";
 import { cancelarMinuta } from "../modules/minutas/07_cancel";
 import { reabrirMinuta } from "../modules/minutas/08_reopen";
 import { finalizarMinuta } from "../modules/minutas/09_finish";
+import { generarPdfPorArea } from "../modules/minutas/10_generate-pdf-area";
 
 const router = Router();
 router.use(authenticate);
@@ -19,19 +20,26 @@ router.use(authenticate);
 router.get("/",           validate(listMinutasSchema),   listarMinutas);
 // POST /api/minutas
 router.post("/",          validate(createMinutaSchema),  crearMinuta);
-// GET  /api/minutas/:id
-router.get("/:id",        validate(minutaIdSchema),      getMinutaById);
+
+// ─── RUTAS CON SUB-RECURSOS (Deben ir antes que :id) ───
+// GET  /api/minutas/:id/pdf-area/:area
+router.get("/:id/pdf-area/:area", (req, res, next) => {
+  console.log(`[DEBUG] Request PDF AREA: id=${req.params.id}, area=${req.params.area}`);
+  next();
+}, generarPdfPorArea);
+
 // GET  /api/minutas/:id/compare
 router.get("/:id/compare", validate(minutaIdSchema),     compararConAnterior);
-// PATCH /api/minutas/:id/cerrar
+
+// ─── RUTAS DE ESTADO ───
 router.patch("/:id/cerrar", validate(minutaIdSchema),    cerrarMinuta);
-// POST /api/minutas/:id/iniciar
 router.post("/:id/iniciar", validate(minutaIdSchema),    iniciarMinuta);
-// POST /api/minutas/:id/cancelar
 router.post("/:id/cancelar", validate(minutaIdSchema),   cancelarMinuta);
-// PATCH /api/minutas/:id/reabrir
 router.patch("/:id/reabrir", validate(minutaIdSchema),   reabrirMinuta);
-// POST /api/minutas/:id/finalizar
 router.post("/:id/finalizar", validate(minutaIdSchema),  finalizarMinuta);
+
+// ─── RUTA BASE POR ID (Atrapa todo lo demás) ───
+// GET  /api/minutas/:id
+router.get("/:id",        validate(minutaIdSchema),      getMinutaById);
 
 export default router;

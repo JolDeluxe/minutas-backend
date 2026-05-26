@@ -27,6 +27,7 @@
   "dependencies": {
     "@prisma/client": "5.22.0",
     "@t3-oss/env-core": "^0.13.10",
+    "axios": "^1.16.1",
     "bcryptjs": "^3.0.3",
     "cloudinary": "^2.9.0",
     "cors": "^2.8.5",
@@ -40,6 +41,7 @@
     "nodemailer": "^8.0.0",
     "pdfkit": "^0.18.0",
     "socket.io": "^4.8.3",
+    "svg-to-pdfkit": "^0.1.8",
     "web-push": "^3.6.7",
     "zod": "^4.3.6"
   },

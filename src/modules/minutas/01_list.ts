@@ -92,8 +92,7 @@ export const listarMinutas = async (req: Request, res: Response) => {
         if (t.tipo !== TipoEntrada.TAREA) continue;
 
         // Ignorar tareas externas para el KPI operativo del dashboard
-        const isExterna = (m.departamento === 'DISENO' && t.area === 'MARKETING') || 
-                          (m.departamento === 'MARKETING' && t.area === 'DISENO');
+        const isExterna = t.area != null && (m.departamento as string) !== (t.area as string);
         if (isExterna) continue;
 
         if (t.estado === EstadoTarea.CERRADA) {
