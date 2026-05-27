@@ -65,6 +65,16 @@ export const buildTareasWhere = (
   }
 ): Prisma.TareaWhereInput => {
   const where: Prisma.TareaWhereInput = {};
+  const and: Prisma.TareaWhereInput[] = [];
+
+  const addEstadoNotInIncludingNull = (estados: EstadoTarea[]) => {
+    and.push({
+      OR: [
+        { estado: { notIn: estados } },
+        { estado: null },
+      ],
+    });
+  };
 
   if (usuario.rol !== Rol.ADMIN && usuario.rol !== Rol.COORDINADOR && usuario.departamento) {
     where.departamento = usuario.departamento;
@@ -88,7 +98,7 @@ export const buildTareasWhere = (
     where.estado = { in: query.estado as EstadoTarea[] };
   } else if (!query.atrasadas && !(query as any).todo && (!query.tipo || query.tipo.includes("TAREA" as any))) {
     // Por defecto, esconder cerradas o canceladas a menos que pida "todo"
-    where.estado = { notIn: [EstadoTarea.CERRADA, EstadoTarea.CANCELADA] };
+    addEstadoNotInIncludingNull([EstadoTarea.CERRADA, EstadoTarea.CANCELADA]);
   }
 
   if (query.alcanceRecordatorio?.length) {
@@ -97,6 +107,17 @@ export const buildTareasWhere = (
 
   if (query.area?.length) {
     where.area = { in: query.area as Area[] };
+  }
+
+  if (query.isExternalArea !== undefined && !query.area?.length) {
+    const deptoReferencia = usuario.rol === Rol.ADMIN && (query as any).departamento
+      ? (query as any).departamento
+      : usuario.departamento;
+
+    if (deptoReferencia) {
+      const areaInterna = deptoReferencia === Departamento.MARKETING ? Area.MARKETING : Area.DISENO;
+      where.area = query.isExternalArea ? { not: areaInterna } : areaInterna;
+    }
   }
 
   if (query.linea?.length) {
@@ -147,13 +168,30 @@ export const buildTareasWhere = (
 
   if (query.atrasadas) {
     where.fechaVencimiento = { lt: new Date() };
-    where.estado = { notIn: [EstadoTarea.CERRADA, EstadoTarea.CANCELADA] };
+    where.tipo = TipoEntrada.TAREA;
+    addEstadoNotInIncludingNull([EstadoTarea.CERRADA, EstadoTarea.CANCELADA]);
   }
 
   if (query.createdDesde || query.createdHasta) {
     where.createdAt = {};
     if (query.createdDesde) where.createdAt.gte = new Date(query.createdDesde);
     if (query.createdHasta) where.createdAt.lte = new Date(query.createdHasta);
+  } else if ((query as any).year || (query as any).month) {
+    const now = new Date();
+    const year = (query as any).year ?? now.getFullYear();
+
+    if ((query as any).month) {
+      const month = (query as any).month;
+      where.createdAt = {
+        gte: new Date(year, month - 1, 1, 0, 0, 0, 0),
+        lte: new Date(year, month, 0, 23, 59, 59, 999),
+      };
+    } else {
+      where.createdAt = {
+        gte: new Date(year, 0, 1, 0, 0, 0, 0),
+        lte: new Date(year, 11, 31, 23, 59, 59, 999),
+      };
+    }
   }
 
   if (query.vencimientoDesde || query.vencimientoHasta) {
@@ -170,7 +208,8 @@ export const buildTareasWhere = (
 
   // Visibilidad base
   if (usuario.rol === Rol.COORDINADOR) {
-      where.OR = [
+      and.push({
+        OR: [
           {
               asignaciones: { some: { usuarioId: usuario.id } }
           },
@@ -180,9 +219,14 @@ export const buildTareasWhere = (
               departamento: usuario.departamento ?? undefined,
               linea: usuario.linea ?? undefined
           }
-      ];
+        ],
+      });
   } else if (query.responsableId != null) {
       where.asignaciones = { some: { usuarioId: query.responsableId } };
+  }
+
+  if (and.length > 0) {
+    where.AND = and;
   }
 
   return where;

@@ -1,13 +1,13 @@
 import type { Request, Response } from "express";
 import { prisma } from "../../db";
-import { Prisma, TipoEntrada, Rol, AlcanceRecordatorio } from "@prisma/client";
+import { Area, Prisma, TipoEntrada, Rol, AlcanceRecordatorio, Departamento } from "@prisma/client";
 import { registrarError } from "../../utils/logger";
 import { USUARIO_SELECT_BASICO } from "../shared-selects";
 
 export const listRecordatorios = async (req: Request, res: Response) => {
   try {
     const usuario = req.user!;
-    const limit = Number(req.query.limit) || 20;
+    const limit = Math.min(Number(req.query.limit) || 50, 100);
     const page = Number(req.query.page) || 1;
     const offset = (page - 1) * limit;
 
@@ -20,18 +20,36 @@ export const listRecordatorios = async (req: Request, res: Response) => {
       where.departamento = usuario.departamento;
     }
 
-    // Regla de Visibilidad para Coordinador
-    if (usuario.rol === Rol.COORDINADOR) {
+    if (usuario.rol === Rol.ADMIN && req.query.departamento) {
+      where.departamento = req.query.departamento as Departamento;
+    }
+
+    if (req.query.responsableId) {
+      const responsableId =
+        usuario.rol === Rol.ADMIN ? Number(req.query.responsableId) : usuario.id;
+
+      where.asignaciones = { some: { usuarioId: responsableId } };
+    } else if (usuario.rol === Rol.COORDINADOR) {
       where.OR = [
         { asignaciones: { some: { usuarioId: usuario.id } } }, // "Mis recordatorios"
         { alcanceRecordatorio: AlcanceRecordatorio.DEPARTAMENTO } // "De mi departamento"
       ];
-    } else if (req.query.responsableId) {
-      where.asignaciones = { some: { usuarioId: Number(req.query.responsableId) } };
     }
 
     if (req.query.q) {
       where.descripcion = { contains: String(req.query.q) };
+    }
+
+    if (req.query.area && req.query.area !== "TODOS") {
+      where.area = req.query.area as Area;
+    }
+
+    if (req.query.linea && req.query.linea !== "TODOS") {
+      where.linea = String(req.query.linea);
+    }
+
+    if (req.query.alcanceRecordatorio && req.query.alcanceRecordatorio !== "TODOS") {
+      where.alcanceRecordatorio = req.query.alcanceRecordatorio as AlcanceRecordatorio;
     }
     
     if (req.query.minutaId) {
@@ -47,7 +65,12 @@ export const listRecordatorios = async (req: Request, res: Response) => {
         orderBy: { createdAt: "desc" },
         include: {
           minuta: {
-             select: { id: true, titulo: true }
+             select: { id: true, titulo: true, fechaProgramada: true, fechaRealizada: true, estado: true }
+          },
+          imagenes: { orderBy: { orden: "asc" } },
+          notas: {
+            orderBy: { createdAt: "desc" },
+            include: { creadoPor: { select: { id: true, nombre: true, imagen: true } } },
           },
           creadoPor: {
             select: USUARIO_SELECT_BASICO,

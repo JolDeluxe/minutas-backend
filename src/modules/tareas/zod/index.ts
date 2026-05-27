@@ -208,6 +208,8 @@ export const listTareasSchema = z.object({
     todo: z.preprocess(parseBool, z.boolean().optional()),
     
     periodo: z.enum(["all", "today", "week", "month"]).optional(),
+    year: z.preprocess(pre, z.coerce.number().int().min(2020).max(2100).optional()),
+    month: z.preprocess(pre, z.coerce.number().int().min(1).max(12).optional()),
     
     createdDesde: isoFecha,
     createdHasta: isoFecha,

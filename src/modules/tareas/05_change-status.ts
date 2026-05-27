@@ -68,10 +68,13 @@ export const changeEstadoTarea = async (req: Request, res: Response) => {
 
     const dataUpdate: Record<string, any> = { estado };
 
-    if (estado === EstadoTarea.CERRADA) {
-      dataUpdate.completadoAt = new Date();
+    if (estado === EstadoTarea.EN_REVISION) {
+      dataUpdate.completadoAt = tarea.completadoAt ?? new Date();
+      dataUpdate.cerradoAt = null;
+    } else if (estado === EstadoTarea.CERRADA) {
+      dataUpdate.completadoAt = tarea.completadoAt ?? new Date();
       dataUpdate.cerradoAt = new Date();
-    } else if (estado === EstadoTarea.CANCELADA) {
+    } else if (estado === EstadoTarea.CANCELADA || estado === EstadoTarea.DESCARTADA) {
       dataUpdate.cerradoAt = new Date();
     } else {
       dataUpdate.completadoAt = null;

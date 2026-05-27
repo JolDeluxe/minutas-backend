@@ -61,7 +61,7 @@ export const listTareas = async (
           by: ["estado"],
           where: {
             ...whereParaResumen,
-            estado: { notIn: [EstadoTarea.CERRADA] },
+            OR: [{ estado: { notIn: [EstadoTarea.CERRADA] } }, { estado: null }],
             tipo: TipoEntrada.TAREA
           },
           _count: { _all: true },
@@ -72,13 +72,15 @@ export const listTareas = async (
           where: {
             ...whereParaResumen,
             fechaVencimiento: { lt: new Date() },
-            estado: { notIn: [EstadoTarea.CERRADA, EstadoTarea.CANCELADA] }
+            tipo: TipoEntrada.TAREA,
+            OR: [{ estado: { notIn: [EstadoTarea.CERRADA, EstadoTarea.CANCELADA] } }, { estado: null }]
           }
         }),
 
         prisma.tarea.count({
           where: {
             ...whereParaResumen,
+            tipo: TipoEntrada.TAREA,
             estado: { in: [EstadoTarea.PENDIENTE, EstadoTarea.EN_REVISION] }
           }
         }),
@@ -86,6 +88,7 @@ export const listTareas = async (
         prisma.tarea.count({
           where: {
             ...whereParaResumen,
+            tipo: TipoEntrada.TAREA,
             estado: EstadoTarea.CERRADA
           }
         })

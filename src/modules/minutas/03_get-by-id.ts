@@ -47,7 +47,7 @@ export const getMinutaById = async (req: Request, res: Response) => {
       return res.status(404).json({ error: "Minuta no encontrada" });
     }
 
-    if (usuario.rol !== "ADMIN" && usuario.departamento && minuta.creadoPor?.departamento && minuta.creadoPor.departamento !== usuario.departamento) {
+    if (usuario.rol !== "ADMIN" && usuario.departamento && minuta.departamento !== usuario.departamento) {
       return res.status(403).json({ error: "No tienes permiso para acceder a esta minuta." });
     }
 
@@ -95,7 +95,7 @@ export const getMinutaById = async (req: Request, res: Response) => {
           where: {
             ...whereBase,
             fechaVencimiento: { lt: now },
-            estado: { notIn: [EstadoTarea.CERRADA, EstadoTarea.CANCELADA] },
+            OR: [{ estado: { notIn: [EstadoTarea.CERRADA, EstadoTarea.CANCELADA] } }, { estado: null }],
           },
         }),
       ]);

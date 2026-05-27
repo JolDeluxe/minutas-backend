@@ -72,6 +72,11 @@ enum EstadoMinuta {
   CANCELADA
 }
 
+enum TipoImagen {
+  CAPTURA
+  EVIDENCIA
+}
+
 enum TipoEventoEntrada {
   CAPTURA
   ACTUALIZACION
@@ -297,6 +302,7 @@ model TareaImagen {
   url      String @db.VarChar(500)
   publicId String @db.VarChar(300) // Cloudinary public ID para poder eliminar
   orden    Int // 1, 2 o 3
+  tipo     TipoImagen @default(CAPTURA)
 
   tareaId Int
   tarea   Tarea @relation(fields: [tareaId], references: [id], onDelete: Cascade)
