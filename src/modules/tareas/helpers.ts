@@ -218,6 +218,10 @@ export const buildTareasWhere = (
               alcanceRecordatorio: AlcanceRecordatorio.DEPARTAMENTO,
               departamento: usuario.departamento ?? undefined,
               linea: usuario.linea ?? undefined
+          },
+          {
+              tipo: TipoEntrada.POLITICA,
+              departamento: usuario.departamento ?? undefined
           }
         ],
       });
