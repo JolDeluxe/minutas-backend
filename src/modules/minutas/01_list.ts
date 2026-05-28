@@ -126,7 +126,7 @@ export const listarMinutas = async (req: Request, res: Response) => {
           atrasadas,
           cerradas,
           porcentajeCompletado: totalTareasOperativas > 0
-            ? Math.round(((completadas + cerradas) / totalTareasOperativas) * 100)
+            ? Math.round((cerradas / totalTareasOperativas) * 100)
             : 0,
         },
       };
