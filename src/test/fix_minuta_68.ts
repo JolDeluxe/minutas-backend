@@ -1,5 +1,5 @@
-import { evaluateMinutaStatus } from "./src/modules/minutas/domain/evaluate-minuta-status";
-import { prisma } from "./src/db";
+import { evaluateMinutaStatus } from "../modules/minutas/domain/evaluate-minuta-status";
+import { prisma } from "../db";
 
 async function run() {
   console.log("Re-evaluating Minuta 68...");

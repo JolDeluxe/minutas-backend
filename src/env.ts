@@ -22,6 +22,10 @@ export const env = createEnv({
     SMTP_PORT: z.coerce.number().optional(),
     SMTP_USER: z.string().optional(),
     SMTP_PASS: z.string().optional(),
+
+    VAPID_PUBLIC_KEY: z.string().min(1),
+    VAPID_PRIVATE_KEY: z.string().min(1),
+    VAPID_SUBJECT: z.string().url().or(z.string().startsWith("mailto:")),
   },
   runtimeEnv: process.env,
   emptyStringAsUndefined: true,

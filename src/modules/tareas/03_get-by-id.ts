@@ -101,9 +101,19 @@ export const getTareaById = async (
       });
     }
 
+    const tareaConResponsables = {
+      ...tarea,
+      responsables: tarea.asignaciones?.map((a: any) => ({
+        id: a.usuario?.id,
+        nombre: a.usuario?.nombre,
+        imagen: a.usuario?.imagen,
+        rol: a.usuario?.rol,
+      })) ?? [],
+    };
+
     return res.json({
       status: "success",
-      data: tarea,
+      data: tareaConResponsables,
     });
   } catch (error) {
     await registrarError(

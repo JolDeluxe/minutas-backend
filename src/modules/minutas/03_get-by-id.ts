@@ -19,7 +19,7 @@ export const getMinutaById = async (req: Request, res: Response) => {
         tareas: {
           where: {
             ...(usuario.rol !== "ADMIN" && usuario.departamento ? { departamento: usuario.departamento } : {}),
-            ...(usuario.rol !== "ADMIN" && usuario.rol !== "GERENCIA" && usuario.linea ? { linea: usuario.linea } : {}),
+            // Jefes and Gerencia can see all tasks in the department's minuta (no line filter)
             ...(usuario.rol === "COORDINADOR"
               ? {
                   asignaciones: {

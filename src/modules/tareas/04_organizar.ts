@@ -5,6 +5,7 @@ import { prisma } from "../../db";
 import { Rol, EstadoTarea, TipoEntrada, TipoNotificacion } from "@prisma/client";
 import { registrarAccion, registrarError } from "../../utils/logger";
 import { registrarCambio, normalizarFechaVencimiento, evaluarEstadoMinuta } from "./helpers";
+import { notificarAsignacion, notificarTareaDescartada } from "../notificaciones/services";
 import type { OrganizarTareaInput, OrganizarTareaParams } from "./zod";
 
 export const organizarTarea = async (req: Request, res: Response) => {
@@ -64,6 +65,7 @@ export const organizarTarea = async (req: Request, res: Response) => {
     }
 
     const historial: { campo: string; antes: string | null; despues: string | null; }[] = [];
+    let idsAgregar: number[] = [];
     
     if (datos.tipo !== tareaActual.tipo) {
         historial.push({ campo: "tipo", antes: tareaActual.tipo, despues: datos.tipo });
@@ -73,7 +75,7 @@ export const organizarTarea = async (req: Request, res: Response) => {
       if (datos.responsables !== undefined && (datos.tipo === TipoEntrada.TAREA || datos.tipo === TipoEntrada.RECORDATORIO)) {
         const idsActuales = new Set(tareaActual.asignaciones.map((a) => a.usuarioId));
         const idsNuevos = new Set(datos.responsables);
-        const idsAgregar = datos.responsables.filter((uid) => !idsActuales.has(uid));
+        idsAgregar = datos.responsables.filter((uid) => !idsActuales.has(uid));
         const idsEliminar = tareaActual.asignaciones.filter((a) => !idsNuevos.has(a.usuarioId)).map((a) => a.id);
 
         if (idsEliminar.length > 0) {
@@ -85,19 +87,6 @@ export const organizarTarea = async (req: Request, res: Response) => {
             data: idsAgregar.map((uid) => ({ tareaId: id, usuarioId: uid, asignadoPorId: usuarioId })),
             skipDuplicates: true,
           });
-          
-          // Crear notificaciones a los agregados
-          for (const uid of idsAgregar) {
-              await tx.notificacion.create({
-                  data: {
-                      usuarioId: uid,
-                      tipo: datos.tipo === TipoEntrada.TAREA ? TipoNotificacion.TAREA_ASIGNADA : TipoNotificacion.RECORDATORIO_ASIGNADO,
-                      titulo: `Nueva Asignación`,
-                      cuerpo: `Has sido asignado a un(a) ${datos.tipo.toLowerCase()} organizado por el gerente.`,
-                      tareaId: id
-                  }
-              });
-          }
         }
       } else if (datos.tipo === TipoEntrada.POLITICA || datos.tipo === TipoEntrada.DESCARTADA) {
          // Eliminar asignaciones si no aplican
@@ -132,6 +121,12 @@ export const organizarTarea = async (req: Request, res: Response) => {
         notas: { orderBy: { createdAt: "desc" } },
       },
     });
+
+    if (datos.tipo === TipoEntrada.DESCARTADA && tareaActual.tipo === TipoEntrada.TAREA) {
+      await notificarTareaDescartada(id, tareaActual.descripcion, usuarioId);
+    } else if (idsAgregar.length > 0 && datos.tipo === TipoEntrada.TAREA && tareaActualizada) {
+      await notificarAsignacion(id, idsAgregar, tareaActualizada.descripcion, tareaActualizada.linea);
+    }
 
     return res.json({ status: "success", data: tareaActualizada });
   } catch (error) {

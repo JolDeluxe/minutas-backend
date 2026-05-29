@@ -25,7 +25,7 @@ import {
 } from "./helpers";
 
 import { getIO } from "../../utils/socket";
-
+import { notificarAsignacion } from "../notificaciones/services";
 import type { CreateTareaInput } from "./zod";
 
 export const crearTarea = async (
@@ -225,6 +225,15 @@ export const crearTarea = async (
         });
 
       tareasCompletasResp.push(tareaCompleta);
+
+      if (tareaInput.responsables && tareaInput.responsables.length > 0) {
+        await notificarAsignacion(
+          tareaId,
+          tareaInput.responsables,
+          tareaInput.descripcion,
+          (tareaInput.linea as string | undefined) ?? null
+        );
+      }
     }
 
     await registrarAccion(

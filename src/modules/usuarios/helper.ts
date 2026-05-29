@@ -7,7 +7,11 @@ export const getSecurityFilters = (
   if (usuario.rol === Rol.ADMIN) {
     return {};
   }
-  if (usuario.rol === Rol.GERENCIA) {
+  if (
+    usuario.rol === Rol.GERENCIA ||
+    usuario.rol === Rol.JEFE ||
+    usuario.rol === Rol.COORDINADOR
+  ) {
     return { departamento: usuario.departamento };
   }
   return null;

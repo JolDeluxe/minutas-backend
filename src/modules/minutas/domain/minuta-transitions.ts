@@ -45,10 +45,14 @@ export const transitionMinutaStatus = async (
   if (toState === EstadoMinuta.EN_CURSO) {
     data.fechaRealizada = new Date();
   } else if (toState === EstadoMinuta.CERRADA) {
-    data.cerradoPorId = userId;
+    if (userId && userId > 0) {
+      data.cerradoPorId = userId;
+    }
     data.cerradoAt = new Date();
   } else if (toState === EstadoMinuta.CANCELADA) {
-    data.canceladoPorId = userId;
+    if (userId && userId > 0) {
+      data.canceladoPorId = userId;
+    }
     data.canceladoAt = new Date();
   }
 

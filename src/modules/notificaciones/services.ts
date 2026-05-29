@@ -1,4 +1,4 @@
-import { Rol, EstadoTarea, TipoNotificacion, Estatus, Area } from "@prisma/client";
+import { Rol, EstadoTarea, TipoNotificacion, Estatus, Area, Departamento } from "@prisma/client";
 import { prisma } from "../../db";
 import { registrarError } from "../../utils/logger";
 import { persistirYEmitir } from "./helper";
@@ -34,8 +34,6 @@ const recortar = (texto: string, max = 70): string =>
 /**
  * Notifica a los Jefes de las líneas afectadas que hay nuevas tareas
  * pendientes de organización post-junta (inicio de Fase 2).
- *
- * Llamar desde: `src/modules/tareas/02_create.ts`
  */
 export const notificarNuevasTareas = async (
   minutaId: number | null,
@@ -44,7 +42,6 @@ export const notificarNuevasTareas = async (
 ): Promise<void> => {
   try {
     const lineasUnicas = [...new Set(lineasAfectadas.filter(Boolean))] as string[];
-
     const idsJefesSet = new Set<number>();
 
     if (lineasUnicas.length > 0) {
@@ -68,7 +65,9 @@ export const notificarNuevasTareas = async (
       [...idsJefesSet],
       TipoNotificacion.NUEVAS_ENTRADAS,
       titulo,
-      cuerpo
+      cuerpo,
+      undefined,
+      minutaId ? `/minutas/${minutaId}` : undefined
     );
   } catch (error) {
     await registrarError("NOTIF_NUEVAS_TAREAS", null, error);
@@ -77,8 +76,6 @@ export const notificarNuevasTareas = async (
 
 /**
  * Notifica a los responsables recién asignados a una tarea (Fase 2 - post-junta).
- *
- * Llamar desde: `src/modules/tareas/04_update.ts` cuando cambian los responsables.
  */
 export const notificarAsignacion = async (
   tareaId: number,
@@ -98,7 +95,8 @@ export const notificarAsignacion = async (
       TipoNotificacion.TAREA_ASIGNADA,
       titulo,
       cuerpo,
-      tareaId
+      tareaId,
+      "/tareas/mis-tareas"
     );
   } catch (error) {
     await registrarError("NOTIF_ASIGNACION", null, error);
@@ -106,11 +104,7 @@ export const notificarAsignacion = async (
 };
 
 /**
- * Notifica sobre cambios de estado relevantes en una tarea interna (área DISEÑO).
- * Las tareas externas no generan notificaciones automáticas.
- * Solo aplica para: COMPLETADO y CERRADO.
- *
- * Llamar desde: `src/modules/tareas/05_change-status.ts`
+ * Notifica sobre cambios de estado relevantes en una tarea.
  */
 export const notificarCambioEstado = async (
   tarea: TareaConRelaciones,
@@ -118,31 +112,39 @@ export const notificarCambioEstado = async (
   actorId: number
 ): Promise<void> => {
   try {
-    if (tarea.area !== Area.DISENO) return;
-
     const descripcionCorta = `"${recortar(tarea.descripcion)}"`;
     const idsAsignados = (tarea.asignaciones ?? [])
       .map((a) => a.usuario.id)
       .filter((id) => id !== actorId);
-    const idsJefes = await obtenerJefesPorLinea(tarea.linea);
-    const idsGerencia = await obtenerIdsGerencia();
-
+      
     switch (nuevoEstado) {
       case EstadoTarea.EN_REVISION: {
-        // Notificar al Jefe y Gerencia: la tarea espera revisión y cierre
-        const destinatarios = [
-          ...new Set([
-            ...idsJefes.filter((id) => id !== actorId),
-            ...idsGerencia.filter((id) => id !== actorId),
-          ]),
-        ];
+        // Notificar al Jefe de la línea de la tarea
+        const idsJefes = await obtenerJefesPorLinea(tarea.linea);
+        
+        // Gerencia solo si asignaron la tarea o la crearon
+        const idsGerencia = await obtenerIdsGerencia();
+        const fueAsignadaPorGerencia = (tarea.asignaciones ?? []).some(
+          a => a.asignadoPorId && idsGerencia.includes(a.asignadoPorId)
+        ) || idsGerencia.includes(tarea.creadoPorId);
+
+        const destinatariosSet = new Set<number>();
+        idsJefes.filter(id => id !== actorId).forEach(id => destinatariosSet.add(id));
+        
+        if (fueAsignadaPorGerencia) {
+          idsGerencia.filter(id => id !== actorId).forEach(id => destinatariosSet.add(id));
+        }
+
+        const destinatarios = [...destinatariosSet];
+        
         if (destinatarios.length > 0) {
           await persistirYEmitir(
             destinatarios,
             TipoNotificacion.REVISION_PENDIENTE,
             "✅ Tarea Completada — Pendiente de Cierre",
             `La tarea ${descripcionCorta} fue completada y requiere ser cerrada.`,
-            tarea.id
+            tarea.id,
+            "/tareas/por-aprobar"
           );
         }
         break;
@@ -156,7 +158,8 @@ export const notificarCambioEstado = async (
             TipoNotificacion.TAREA_CERRADA,
             "🔒 Tarea Cerrada",
             `La tarea ${descripcionCorta} ha sido cerrada definitivamente.`,
-            tarea.id
+            tarea.id,
+            "/tareas/mis-tareas"
           );
         }
         break;
@@ -171,10 +174,75 @@ export const notificarCambioEstado = async (
 };
 
 /**
- * Notifica al Jefe de la nueva línea cuando una tarea es reasignada de línea.
- *
- * Llamar desde: `src/modules/tareas/04_update.ts` cuando cambia el campo `linea`.
+ * Nueva función: Notificar descarte de tarea.
  */
+export const notificarTareaDescartada = async (
+  tareaId: number,
+  descripcion: string,
+  actorId: number
+): Promise<void> => {
+  try {
+    const tarea = await prisma.tarea.findUnique({
+      where: { id: tareaId },
+      include: { asignaciones: true }
+    });
+    if (!tarea) return;
+
+    const idsAsignados = tarea.asignaciones
+      .map((a) => a.usuarioId)
+      .filter((id) => id !== actorId);
+
+    if (idsAsignados.length > 0) {
+      await persistirYEmitir(
+        idsAsignados,
+        TipoNotificacion.ENTRADA_DESCARTADA,
+        "🗑️ Tarea Descartada",
+        `No es necesario seguir trabajando en la tarea: "${recortar(descripcion)}"`,
+        tareaId,
+        "/tareas/mis-tareas"
+      );
+    }
+  } catch (error) {
+    await registrarError("NOTIF_TAREA_DESCARTADA", null, error);
+  }
+};
+
+/**
+ * Nueva función: Notificar organización de minuta al finalizar.
+ */
+export const notificarMinutaOrganizacion = async (
+  minutaId: number,
+  departamento: Departamento
+): Promise<void> => {
+  try {
+    const jefesYGerentes = await prisma.usuario.findMany({
+      where: {
+        estado: Estatus.ACTIVO,
+        departamento,
+        rol: { in: [Rol.JEFE, Rol.GERENCIA] }
+      },
+      select: { id: true, rol: true, linea: true }
+    });
+
+    for (const usuario of jefesYGerentes) {
+      const actionUrl = usuario.rol === Rol.GERENCIA 
+        ? `/minutas/${minutaId}` 
+        : `/minutas/${minutaId}?linea=${usuario.linea || ''}`;
+
+      await persistirYEmitir(
+        [usuario.id],
+        TipoNotificacion.NUEVAS_ENTRADAS,
+        "📋 Minuta Finalizada",
+        `La minuta #${minutaId} ha finalizado. Requiere organización de entradas.`,
+        undefined,
+        actionUrl
+      );
+    }
+  } catch (error) {
+    await registrarError("NOTIF_MINUTA_ORGANIZACION", null, error);
+  }
+};
+
 export const notificarLineaCambiada = async (
   tareaId: number,
   descripcion: string,
@@ -192,18 +260,14 @@ export const notificarLineaCambiada = async (
       TipoNotificacion.LINEA_CAMBIADA,
       "🔀 Nueva Tarea en tu Línea",
       `La tarea "${recortar(descripcion)}" fue movida a la línea ${lineaNueva}.`,
-      tareaId
+      tareaId,
+      "/tareas/por-aprobar"
     );
   } catch (error) {
     await registrarError("NOTIF_LINEA_CAMBIADA", null, error);
   }
 };
 
-/**
- * Notifica a responsables y al Jefe de la línea sobre tareas próximas a vencer.
- *
- * Llamar desde: `src/utils/scheduler.ts` (CRON diario).
- */
 export const notificarVencimientoProximo = async (
   tareas: Array<{
     id: number;
@@ -234,7 +298,8 @@ export const notificarVencimientoProximo = async (
         TipoNotificacion.VENCIMIENTO_PROXIMO,
         "⏰ Tarea Por Vencer",
         `La tarea "${recortar(tarea.descripcion)}" vence el ${fechaStr}.`,
-        tarea.id
+        tarea.id,
+        "/tareas/mis-tareas"
       );
     }
   } catch (error) {
@@ -242,12 +307,6 @@ export const notificarVencimientoProximo = async (
   }
 };
 
-/**
- * Notifica a los responsables asignados cuando se modifica información relevante
- * de una tarea (descripción, prioridad, fecha de vencimiento).
- *
- * Llamar desde: `src/modules/tareas/04_update.ts`
- */
 export const notificarTareaActualizada = async (
   tareaId: number,
   descripcion: string,
@@ -263,7 +322,8 @@ export const notificarTareaActualizada = async (
       TipoNotificacion.TAREA_MODIFICADA,
       "📝 Tarea Actualizada",
       `La tarea "${recortar(descripcion)}" tuvo cambios en sus detalles.`,
-      tareaId
+      tareaId,
+      "/tareas/mis-tareas"
     );
   } catch (error) {
     await registrarError("NOTIF_TAREA_ACTUALIZADA", null, error);

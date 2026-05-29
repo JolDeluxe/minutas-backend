@@ -1,4 +1,4 @@
-import { prisma } from "./src/db";
+import { prisma } from "../db";
 
 async function checkTasks() {
   const minutaId = 68;

@@ -76,14 +76,21 @@ export const buildTareasWhere = (
     });
   };
 
-  if (usuario.rol !== Rol.ADMIN && usuario.rol !== Rol.COORDINADOR && usuario.departamento) {
-    where.departamento = usuario.departamento;
-  } else if (usuario.rol === Rol.ADMIN && (query as any).departamento) {
-    where.departamento = (query as any).departamento;
-  }
+  const esMiBandejaPersonal = query.responsableId != null && Number(query.responsableId) === usuario.id;
 
-  if (usuario.rol !== Rol.ADMIN && usuario.rol !== Rol.GERENCIA && usuario.rol !== Rol.COORDINADOR && usuario.linea) {
-    where.linea = usuario.linea;
+  if (!esMiBandejaPersonal) {
+    if (usuario.rol !== Rol.ADMIN && usuario.rol !== Rol.COORDINADOR && usuario.departamento) {
+      where.departamento = usuario.departamento;
+    } else if (usuario.rol === Rol.ADMIN && (query as any).departamento) {
+      where.departamento = (query as any).departamento;
+    }
+
+    if (usuario.rol !== Rol.ADMIN && usuario.rol !== Rol.GERENCIA && usuario.rol !== Rol.COORDINADOR && usuario.linea) {
+      if (query.minutaId == null) {
+        // En su tablero personal, filtrar por su línea. Dentro de una minuta, puede ver todas las líneas de su departamento.
+        where.linea = usuario.linea;
+      }
+    }
   }
 
   if (query.q) {

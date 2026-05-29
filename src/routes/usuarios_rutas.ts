@@ -25,7 +25,7 @@ router.use(authenticate);
 // GET /api/usuarios
 router.get(
   "/",
-  authorize([Rol.GERENCIA, Rol.ADMIN]),
+  authorize([Rol.GERENCIA, Rol.ADMIN, Rol.JEFE, Rol.COORDINADOR]),
   validate(listUsuariosSchema),
   listarUsuarios
 );

@@ -57,12 +57,13 @@ export const evaluateMinutaStatus = async (
 
   const hasUnorganizedEntries = entradasInternas.some((e) => e.tipo === TipoEntrada.SIN_ORGANIZAR);
   
-  // Consideramos seguimiento activo a cualquier entrada (principalmente TAREAS) que tenga estado PENDIENTE o EN_REVISION.
+  // Consideramos seguimiento activo únicamente a las TAREAS que tengan estado PENDIENTE o EN_REVISION.
   const hasActiveTracking = entradasInternas.some(
     (e) =>
-      (e.tipo === TipoEntrada.TAREA || e.estado != null) &&
+      e.tipo === TipoEntrada.TAREA &&
       e.estado !== EstadoTarea.CERRADA &&
-      e.estado !== EstadoTarea.CANCELADA
+      e.estado !== EstadoTarea.CANCELADA &&
+      e.estado !== EstadoTarea.DESCARTADA
   );
 
   let targetState: EstadoMinuta = estado;

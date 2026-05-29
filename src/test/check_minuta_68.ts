@@ -1,4 +1,4 @@
-import { prisma } from "./src/db";
+import { prisma } from "../db";
 import { TipoEntrada } from "@prisma/client";
 
 async function check() {

@@ -5,6 +5,7 @@ import { prisma } from "../../db";
 import { Rol, EstadoTarea } from "@prisma/client";
 import { registrarAccion, registrarError } from "../../utils/logger";
 import { registrarCambio, normalizarFechaVencimiento, evaluarEstadoMinuta } from "./helpers";
+import { notificarAsignacion, notificarTareaActualizada } from "../notificaciones/services";
 import type { UpdateTareaInput, UpdateTareaParams } from "./zod";
 
 export const updateTarea = async (req: Request, res: Response) => {
@@ -75,12 +76,14 @@ export const updateTarea = async (req: Request, res: Response) => {
       }
     }
 
+    let idsAgregar: number[] = [];
+
     await prisma.$transaction(async (tx) => {
       // Manejo de responsables
       if (datos.responsables !== undefined) {
         const idsActuales = new Set(tareaActual.asignaciones.map((a) => a.usuarioId));
         const idsNuevos = new Set(datos.responsables);
-        const idsAgregar = datos.responsables.filter((uid) => !idsActuales.has(uid));
+        idsAgregar = datos.responsables.filter((uid) => !idsActuales.has(uid));
         const idsEliminar = tareaActual.asignaciones.filter((a) => !idsNuevos.has(a.usuarioId)).map((a) => a.id);
 
         if (idsEliminar.length > 0) {
@@ -123,6 +126,21 @@ export const updateTarea = async (req: Request, res: Response) => {
         notas: { orderBy: { createdAt: "desc" } },
       },
     });
+
+    if (tareaActualizada) {
+      if (idsAgregar.length > 0) {
+        await notificarAsignacion(id, idsAgregar, tareaActualizada.descripcion, tareaActualizada.linea);
+      }
+      if (historial.length > 0) {
+        const idsResponsablesNuevosExcluidos = tareaActualizada.asignaciones
+          .map((a) => a.usuarioId)
+          .filter((uid) => !idsAgregar.includes(uid));
+
+        if (idsResponsablesNuevosExcluidos.length > 0) {
+          await notificarTareaActualizada(id, tareaActualizada.descripcion, idsResponsablesNuevosExcluidos, usuarioId);
+        }
+      }
+    }
 
     return res.json({ status: "success", data: tareaActualizada });
   } catch (error) {

@@ -11,6 +11,7 @@ import {
 import { registrarAccion, registrarError } from "../../utils/logger";
 import { registrarCambio, evaluarEstadoMinuta } from "./helpers";
 import { getIO } from "../../utils/socket";
+import { notificarCambioEstado } from "../notificaciones/services";
 import type { ChangeEstadoInput, ChangeEstadoParams } from "./zod";
 
 export const changeEstadoTarea = async (req: Request, res: Response) => {
@@ -23,7 +24,13 @@ export const changeEstadoTarea = async (req: Request, res: Response) => {
     const tarea = await prisma.tarea.findUnique({
       where: { id },
       include: {
-        asignaciones: true,
+        asignaciones: {
+          include: {
+            usuario: {
+              select: { rol: true }
+            }
+          }
+        },
       },
     });
 
@@ -35,7 +42,8 @@ export const changeEstadoTarea = async (req: Request, res: Response) => {
       return res.status(400).json({ error: "Solo las entradas clasificadas como TAREA tienen flujo de estados" });
     }
 
-    const esJefeOGerente = [Rol.GERENCIA as string, Rol.JEFE as string, Rol.ADMIN as string].includes(rolUsuario);
+    const tieneJefeAsignado = tarea.asignaciones.some(a => a.usuario.rol === Rol.JEFE);
+    const esJefeOGerente = rolUsuario === Rol.ADMIN || rolUsuario === Rol.GERENCIA || (rolUsuario === Rol.JEFE && !tieneJefeAsignado);
 
     // ── LÓGICA DE TRANSICIONES ──────────────────────────────────
     if (!esJefeOGerente) {
@@ -86,32 +94,6 @@ export const changeEstadoTarea = async (req: Request, res: Response) => {
           where: { id },
           data: dataUpdate,
         });
-
-        // Notificaciones según el estado
-        if (estado === EstadoTarea.EN_REVISION && tarea.organizadoPorId) {
-             await tx.notificacion.create({
-                 data: {
-                     usuarioId: tarea.organizadoPorId,
-                     tipo: TipoNotificacion.TAREA_EN_REVISION,
-                     titulo: 'Tarea en Revisión',
-                     cuerpo: `El equipo ha marcado la tarea como completada y espera tu revisión.`,
-                     tareaId: id
-                 }
-             });
-        } else if (estado === EstadoTarea.CERRADA || estado === EstadoTarea.CANCELADA) {
-             // Notificar a los asignados
-             for (const asig of tarea.asignaciones) {
-                 await tx.notificacion.create({
-                     data: {
-                         usuarioId: asig.usuarioId,
-                         tipo: estado === EstadoTarea.CERRADA ? TipoNotificacion.TAREA_CERRADA : TipoNotificacion.TAREA_CANCELADA,
-                         titulo: estado === EstadoTarea.CERRADA ? 'Tarea Cerrada' : 'Tarea Cancelada',
-                         cuerpo: `La tarea ha sido ${estado === EstadoTarea.CERRADA ? 'cerrada aprobada' : 'cancelada'} por el gerente.`,
-                         tareaId: id
-                     }
-                 });
-             }
-        }
     });
 
     if (estado !== tarea.estado) {
@@ -119,7 +101,7 @@ export const changeEstadoTarea = async (req: Request, res: Response) => {
     }
 
     if (tarea.minutaId) {
-      await evaluarEstadoMinuta(tarea.minutaId);
+      await evaluarEstadoMinuta(tarea.minutaId, usuarioId);
     }
 
     await registrarAccion("CAMBIO_ESTADO_TAREA", usuarioId, `Tarea ${id} movida a ${estado}`);
@@ -140,6 +122,10 @@ export const changeEstadoTarea = async (req: Request, res: Response) => {
         notas: { orderBy: { createdAt: "desc" } },
       },
     });
+
+    if (tareaActualizada) {
+      await notificarCambioEstado(tareaActualizada as any, estado, usuarioId);
+    }
 
     try {
       getIO().to("global_updates").emit("tarea_estado_cambiado", { tareaId: id });

@@ -3,7 +3,9 @@ import { prisma } from "../../db";
 import { Rol, EstadoTarea, EstadoMinuta, TipoEntrada } from "@prisma/client";
 import { registrarAccion, registrarError } from "../../utils/logger";
 import { deleteImageByPublicId } from "../../utils/cloudinary";
+import { notificarTareaDescartada } from "../notificaciones/services";
 import type { DeleteTareaParams } from "./zod";
+import { evaluarEstadoMinuta } from "./helpers";
 
 /**
  * Eliminación Lógica de una Tarea/Entrada.
@@ -67,6 +69,11 @@ export const deleteTarea = async (req: Request, res: Response) => {
       },
     });
 
+    // Reevaluar estado de la minuta al eliminar
+    if (tarea.minutaId) {
+      await evaluarEstadoMinuta(tarea.minutaId, usuarioId);
+    }
+
     // 4. Responder inmediatamente a la UI
     res.status(200).json({ message: "Entrada descartada correctamente." });
 
@@ -78,6 +85,9 @@ export const deleteTarea = async (req: Request, res: Response) => {
           usuarioId,
           `Entrada organizacional descartada ID ${id}`
         );
+        if (isTareaFormalizada) {
+          await notificarTareaDescartada(id, tarea.descripcion, usuarioId);
+        }
       } catch (backgroundError) {
         await registrarError(
           "DELETE_TAREA_BACKGROUND",

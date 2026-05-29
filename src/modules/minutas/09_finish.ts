@@ -4,6 +4,7 @@ import { EstadoMinuta } from "@prisma/client";
 import { registrarAccion, registrarError } from "../../utils/logger";
 import { transitionMinutaStatus } from "./domain/minuta-transitions";
 import { evaluateMinutaStatus } from "./domain/evaluate-minuta-status";
+import { notificarMinutaOrganizacion } from "../notificaciones/services";
 import type { MinutaIdParams } from "./zod";
 
 export const finalizarMinuta = async (req: Request, res: Response) => {
@@ -38,6 +39,10 @@ export const finalizarMinuta = async (req: Request, res: Response) => {
     const minutaFinal = await prisma.minuta.findUnique({ where: { id } });
 
     await registrarAccion("FINALIZAR_JUNTA", usuarioId, `Minuta ID: ${id}`);
+
+    if (minutaFinal && minutaFinal.estado === EstadoMinuta.EN_ORGANIZACION) {
+      await notificarMinutaOrganizacion(minutaFinal.id, minutaFinal.departamento);
+    }
 
     return res.json({
       status: "success",
