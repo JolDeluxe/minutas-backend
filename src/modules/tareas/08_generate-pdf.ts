@@ -64,11 +64,11 @@ export const generarPdfTarea = async (req: Request, res: Response) => {
 
       doc.moveDown(4);
 
-      // LÍNEA DESTINO — protagonismo principal
+      // ÁREA — protagonismo principal
       doc.fillColor(accentColor)
          .fontSize(16)
          .font("Helvetica-Bold")
-         .text("LÍNEA DESTINO:", 50, 130);
+         .text("ÁREA:", 50, 130);
       
       doc.fillColor(primaryColor)
          .fontSize(22)
@@ -83,8 +83,8 @@ export const generarPdfTarea = async (req: Request, res: Response) => {
       const leftColX = 50;
       const rightColX = doc.page.width / 2;
 
-      // Área destino — ahora en la sección de detalles
-      doc.fillColor(secondaryColor).fontSize(10).font("Helvetica-Bold").text("ÁREA DESTINO", leftColX, currentY);
+      // Dirección — ahora en la sección de detalles
+      doc.fillColor(secondaryColor).fontSize(10).font("Helvetica-Bold").text("DIRECCIÓN", leftColX, currentY);
       doc.fillColor(primaryColor).fontSize(12).font("Helvetica").text(tarea.area || "No especificada", leftColX, currentY + 15);
 
       doc.fillColor(secondaryColor).fontSize(10).font("Helvetica-Bold").text("CLASIFICACIÓN", rightColX, currentY);

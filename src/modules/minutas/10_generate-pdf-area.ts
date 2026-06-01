@@ -149,7 +149,7 @@ export const generarPdfPorArea = async (req: Request, res: Response) => {
       doc.fillColor(C.muted).fontSize(10).font("Helvetica")
          .text(
            `Puntos y acuerdos asignados al área de ${areaLabel} derivados de la ` +
-           `minuta "${minuta.titulo}" levada acabo el ${fechaStr}.`,
+           `minuta "${minuta.titulo}" llevada a cabo el ${fechaStr}.`,
            MARGIN, doc.y, { width: CW, align: "justify" }
          );
 
