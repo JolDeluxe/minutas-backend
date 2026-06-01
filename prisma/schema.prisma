@@ -90,6 +90,7 @@ enum TipoEventoEntrada {
   DESCARTE
   COMENTARIO
   ADJUNTO
+  NOTIFICACION
 }
 
 // ─── MODELOS ─────────────────────────────────────────────
@@ -225,7 +226,10 @@ model Tarea {
   // ── Solo aplica a tipo = RECORDATORIO ────────────────────
   alcanceRecordatorio AlcanceRecordatorio?
 
-  // ── Infraestructura ──────────────────────────────────────
+  // ── Notificación a área destino (solo ADMIN) ─────────────────
+  notificadoAt DateTime?
+
+  // ── Infraestructura ──────────────────────────────────────────
   pdfUrl String? @db.Text
 
   minutaId Int?

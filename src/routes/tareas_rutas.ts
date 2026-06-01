@@ -24,6 +24,8 @@ import { deleteTarea }       from "../modules/tareas/06_delete";
 import { addImagenTarea, deleteImagenTarea } from "../modules/tareas/07_imagenes";
 import { generarPdfTarea }   from "../modules/tareas/08_generate-pdf";
 import { createNotaGeneral, createTareaNota, updateTareaNota, deleteTareaNota } from "../modules/tareas/10_notas";
+import { toggleNotificado }  from "../modules/tareas/11_toggle-notificado";
+
 
 const router = Router();
 
@@ -67,5 +69,8 @@ router.post("/notas/general", validate(createNotaGeneralSchema), createNotaGener
 router.post("/notas/tarea", validate(createTareaNotaSchema), createTareaNota);
 router.put("/notas/tarea/:id", updateTareaNota);
 router.delete("/notas/tarea/:id", deleteTareaNota);
+
+// ── NOTIFICACIÓN (solo ADMIN) ──
+router.patch("/:id/notificado", validate(tareaIdSchema), toggleNotificado);
 
 export default router;

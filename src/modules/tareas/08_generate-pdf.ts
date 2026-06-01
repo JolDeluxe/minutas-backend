@@ -45,10 +45,9 @@ export const generarPdfTarea = async (req: Request, res: Response) => {
       const accentColor = '#8b5cf6'; // purple-500 (good for external)
       const lightGray = '#f1f5f9';
 
-      // Header Background
+      // Encabezado (Header)
       doc.rect(0, 0, doc.page.width, 100).fill(primaryColor);
 
-      // Header Text
       doc.fillColor('#ffffff')
          .fontSize(24)
          .font("Helvetica-Bold")
@@ -63,19 +62,18 @@ export const generarPdfTarea = async (req: Request, res: Response) => {
       
       doc.text(fechaStr, 0, 60, { align: 'right', width: doc.page.width - 50 });
 
-      // Move down below header
       doc.moveDown(4);
 
-      // Area prominently displayed
+      // LÍNEA DESTINO — protagonismo principal
       doc.fillColor(accentColor)
          .fontSize(16)
          .font("Helvetica-Bold")
-         .text("ÁREA DESTINO:", 50, 130);
+         .text("LÍNEA DESTINO:", 50, 130);
       
       doc.fillColor(primaryColor)
          .fontSize(22)
          .font("Helvetica-Bold")
-         .text(tarea.area, 50, 150);
+         .text(tarea.linea || "No especificada", 50, 150);
 
       // Divider
       doc.moveTo(50, 185).lineTo(doc.page.width - 50, 185).lineWidth(2).strokeColor(lightGray).stroke();
@@ -85,11 +83,12 @@ export const generarPdfTarea = async (req: Request, res: Response) => {
       const leftColX = 50;
       const rightColX = doc.page.width / 2;
 
-      doc.fillColor(secondaryColor).fontSize(10).font("Helvetica-Bold").text("CLASIFICACIÓN", leftColX, currentY);
-      doc.fillColor(primaryColor).fontSize(12).font("Helvetica").text(tarea.clasificacion || "No especificada", leftColX, currentY + 15);
+      // Área destino — ahora en la sección de detalles
+      doc.fillColor(secondaryColor).fontSize(10).font("Helvetica-Bold").text("ÁREA DESTINO", leftColX, currentY);
+      doc.fillColor(primaryColor).fontSize(12).font("Helvetica").text(tarea.area || "No especificada", leftColX, currentY + 15);
 
-      doc.fillColor(secondaryColor).fontSize(10).font("Helvetica-Bold").text("LÍNEA", rightColX, currentY);
-      doc.fillColor(primaryColor).fontSize(12).font("Helvetica").text(tarea.linea || "No especificada", rightColX, currentY + 15);
+      doc.fillColor(secondaryColor).fontSize(10).font("Helvetica-Bold").text("CLASIFICACIÓN", rightColX, currentY);
+      doc.fillColor(primaryColor).fontSize(12).font("Helvetica").text(tarea.clasificacion || "No especificada", rightColX, currentY + 15);
 
       currentY += 45;
       
