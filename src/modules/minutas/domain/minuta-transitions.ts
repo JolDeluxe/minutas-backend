@@ -10,7 +10,7 @@ const VALID_TRANSITIONS: TransitionsMatrix = {
   [EstadoMinuta.EN_CURSO]: [EstadoMinuta.EN_ORGANIZACION, EstadoMinuta.CANCELADA],
   [EstadoMinuta.EN_ORGANIZACION]: [EstadoMinuta.ACTIVA, EstadoMinuta.CERRADA, EstadoMinuta.EN_CURSO],
   [EstadoMinuta.ACTIVA]: [EstadoMinuta.CERRADA, EstadoMinuta.CANCELADA, EstadoMinuta.EN_ORGANIZACION, EstadoMinuta.EN_CURSO],
-  [EstadoMinuta.CERRADA]: [],
+  [EstadoMinuta.CERRADA]: [EstadoMinuta.EN_CURSO],
   [EstadoMinuta.CANCELADA]: [], 
 };
 

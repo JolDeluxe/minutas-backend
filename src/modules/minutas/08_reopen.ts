@@ -23,8 +23,8 @@ export const reabrirMinuta = async (req: Request, res: Response) => {
       return res.status(403).json({ error: "No tienes permiso para acceder a esta minuta." });
     }
 
-    if (minuta.estado !== EstadoMinuta.EN_ORGANIZACION && minuta.estado !== EstadoMinuta.ACTIVA) {
-      return res.status(400).json({ error: "Solo se pueden reabrir minutas que estén en Organización o Activas." });
+    if (minuta.estado !== EstadoMinuta.EN_ORGANIZACION && minuta.estado !== EstadoMinuta.ACTIVA && minuta.estado !== EstadoMinuta.CERRADA) {
+      return res.status(400).json({ error: "Solo se pueden reabrir minutas que estén en Organización, Activas o Cerradas." });
     }
 
     // Al reabrir, regresamos a EN_CURSO para que puedan agregar entradas
