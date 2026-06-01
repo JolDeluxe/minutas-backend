@@ -42,7 +42,7 @@ router.post("/", upload.any(), validate(createTareaSchema), crearTarea);
 // Obtener detalle por ID
 router.get("/:id", validate(tareaIdSchema), getTareaById);
 
-// Generar PDF de evidencia en Cloudinary
+// Generar URL del PDF de evidencia
 router.get("/:id/pdf", validate(tareaIdSchema), generarPdfTarea);
 
 // Actualización de campos de dominio (textos básicos)

@@ -14,6 +14,7 @@ import { finalizarMinuta } from "../modules/minutas/09_finish";
 import { generarPdfPorArea } from "../modules/minutas/10_generate-pdf-area";
 
 const router = Router();
+
 router.use(authenticate);
 
 // GET  /api/minutas

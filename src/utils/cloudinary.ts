@@ -68,11 +68,15 @@ export const uploadTaskImage = async (
 
 export const uploadPdfDocument = async (buffer: Buffer, filename: string): Promise<string> => {
   return new Promise((resolve, reject) => {
+    // Para evitar el error 401 (Unauthorized) por restricciones de seguridad de Cloudinary
+    // para PDFs tipo "image", subimos el documento como recurso "raw".
+    const pdfFilename = filename.endsWith('.pdf') ? filename : `${filename}.pdf`;
+
     const stream = cloudinary.uploader.upload_stream(
       {
         folder: "minutas-diseño/pdf",
-        resource_type: "raw", // Usamos raw para PDFs u otros binarios
-        public_id: filename,
+        resource_type: "raw",
+        public_id: pdfFilename,
       },
       (error, result) => {
         if (error || !result) reject(error);
