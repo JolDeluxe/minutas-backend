@@ -7,6 +7,7 @@ export interface TokenPayload {
   rol: Rol;
   nombre: string;
   linea: string | null;
+  lineas: string[];
   departamento: Departamento | null;
 }
 

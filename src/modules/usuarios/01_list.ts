@@ -61,12 +61,17 @@ export const listarUsuarios = async (req: Request, res: Response) => {
       return acc;
     }, {} as Record<string, number>);
 
+    const dataFinal = usuarios.map(u => ({
+      ...u,
+      lineas: u.linea ? u.linea.split(',') : []
+    }));
+
     return res.json({
       status: "success",
       pagination: { total, page, limit, totalPages: Math.ceil(total / limit) },
       totalAbsoluto,
       resumenRoles: resumen,
-      data: usuarios,
+      data: dataFinal,
     });
   } catch (error) {
     await registrarError("LIST_USUARIOS", req.user?.id ?? null, error);
@@ -92,7 +97,12 @@ export const getUsuarioById = async (req: Request, res: Response) => {
       return res.status(404).json({ error: "Usuario no encontrado." });
     }
 
-    return res.json({ status: "success", data: usuario });
+    const dataFinal = {
+      ...usuario,
+      lineas: usuario.linea ? usuario.linea.split(',') : []
+    };
+
+    return res.json({ status: "success", data: dataFinal });
   } catch (error) {
     await registrarError("GET_USUARIO_ID", req.user?.id ?? null, error);
     return res.status(500).json({ error: "Error interno del servidor" });

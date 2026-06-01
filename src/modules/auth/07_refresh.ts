@@ -59,6 +59,7 @@ export const refreshSession = async (req: Request, res: Response) => {
       rol: usuario.rol,
       nombre: usuario.nombre,
       linea: usuario.linea,
+      lineas: usuario.linea ? usuario.linea.split(',') : [],
       departamento: usuario.departamento,
     };
 

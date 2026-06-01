@@ -144,7 +144,14 @@ export const buildUsuariosWhere = (
     }
   }
 
-  if (query.linea?.length) where.linea = { in: query.linea as string[] };
+  if (query.linea?.length) {
+    where.AND = [
+      ...(where.AND as any[] || []),
+      {
+        OR: query.linea.map(l => ({ linea: { contains: l } }))
+      }
+    ];
+  }
 
   if (query.createdDesde || query.createdHasta) {
     const f: { gte?: Date; lte?: Date } = {};

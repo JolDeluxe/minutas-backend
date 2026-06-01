@@ -82,7 +82,9 @@ export const updateUsuario = async (req: Request, res: Response) => {
       if (datos.rol !== undefined) dataToUpdate.rol = datos.rol as Rol;
       if (datos.estado !== undefined) dataToUpdate.estado = datos.estado;
       if (datos.departamento !== undefined) dataToUpdate.departamento = datos.departamento as Departamento | null;
-      if (datos.linea !== undefined) dataToUpdate.linea = datos.linea as string | null;
+      if (datos.linea !== undefined) {
+        dataToUpdate.linea = Array.isArray(datos.linea) ? datos.linea.join(',') : (datos.linea || null);
+      }
     }
 
     const usuarioActualizado = await prisma.usuario.update({
@@ -96,7 +98,12 @@ export const updateUsuario = async (req: Request, res: Response) => {
 
     await registrarAccion("EDITAR_USUARIO", solicitante.id, `Editó usuario ID: ${id}`);
 
-    return res.json({ status: "success", data: usuarioActualizado });
+    const dataFinal = {
+      ...usuarioActualizado,
+      lineas: usuarioActualizado.linea ? usuarioActualizado.linea.split(',') : []
+    };
+
+    return res.json({ status: "success", data: dataFinal });
   } catch (error) {
     await registrarError("EDITAR_USUARIO_ERROR", req.user?.id || null, error);
     return res.status(500).json({ error: "Error interno al editar el usuario" });

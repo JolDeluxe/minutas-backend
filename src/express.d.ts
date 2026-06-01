@@ -11,6 +11,7 @@ declare global {
         rol: Rol;
         departamento?: Departamento | null;
         linea?: string | null; 
+        lineas: string[];
       };
     }
   }

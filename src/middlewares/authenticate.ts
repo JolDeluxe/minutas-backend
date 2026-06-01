@@ -53,7 +53,8 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
       email: usuario.email || "",
       rol: usuario.rol,
       departamento: usuario.departamento,
-      linea: usuario.linea
+      linea: usuario.linea,
+      lineas: usuario.linea ? usuario.linea.split(',') : []
     };
 
     next();

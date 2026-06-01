@@ -47,6 +47,7 @@ export const login = async (req: Request, res: Response) => {
       rol: usuario.rol,
       nombre: usuario.nombre,
       linea: usuario.linea,
+      lineas: usuario.linea ? usuario.linea.split(',') : [],
       departamento: usuario.departamento,
     };
 
@@ -78,6 +79,7 @@ export const login = async (req: Request, res: Response) => {
         email: usuario.email || undefined,
         departamento: usuario.departamento,
         linea: usuario.linea,
+        lineas: usuario.linea ? usuario.linea.split(',') : [],
         mustChangePassword: usuario.mustChangePassword,
       },
     });

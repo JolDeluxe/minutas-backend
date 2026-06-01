@@ -62,6 +62,7 @@ export const buildTareasWhere = (
     rol: Rol;
     departamento?: Departamento | null;
     linea?: string | null;
+    lineas: string[];
   }
 ): Prisma.TareaWhereInput => {
   const where: Prisma.TareaWhereInput = {};
@@ -85,10 +86,10 @@ export const buildTareasWhere = (
       where.departamento = (query as any).departamento;
     }
 
-    if (usuario.rol !== Rol.ADMIN && usuario.rol !== Rol.GERENCIA && usuario.rol !== Rol.COORDINADOR && usuario.linea) {
+    if (usuario.rol !== Rol.ADMIN && usuario.rol !== Rol.GERENCIA && usuario.rol !== Rol.COORDINADOR && usuario.lineas.length > 0) {
       if (query.minutaId == null) {
-        // En su tablero personal, filtrar por su línea. Dentro de una minuta, puede ver todas las líneas de su departamento.
-        where.linea = usuario.linea;
+        // En su tablero personal, filtrar por sus líneas. Dentro de una minuta, puede ver todas las líneas de su departamento.
+        where.linea = { in: usuario.lineas };
       }
     }
   }
@@ -224,7 +225,7 @@ export const buildTareasWhere = (
               tipo: TipoEntrada.RECORDATORIO,
               alcanceRecordatorio: AlcanceRecordatorio.DEPARTAMENTO,
               departamento: usuario.departamento ?? undefined,
-              linea: usuario.linea ?? undefined
+              linea: usuario.lineas.length > 0 ? { in: usuario.lineas } : undefined
           },
           {
               tipo: TipoEntrada.POLITICA,

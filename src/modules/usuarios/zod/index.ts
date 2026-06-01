@@ -73,8 +73,8 @@ export const createUsuarioSchema = z.object({
       z.enum(departamentosArray).nullable().optional()
     ),
     linea: z.preprocess(
-      (val) => (val === "null" || val === "" ? null : val),
-      z.string().nullable().optional()
+      parseCsv,
+      z.array(z.string()).nullable().optional()
     ),
     imagen: z.preprocess(
       (val) => (val === "null" || val === "" ? null : val),
@@ -107,8 +107,8 @@ export const updateUsuarioSchema = z.object({
         z.enum(departamentosArray).nullable().optional()
       ),
       linea: z.preprocess(
-        (val) => (val === "null" || val === "" ? null : val),
-        z.string().nullable().optional()
+        parseCsv,
+        z.array(z.string()).nullable().optional()
       ),
     })
     .strict(),

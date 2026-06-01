@@ -173,8 +173,8 @@ export const getMinutaById = async (req: Request, res: Response) => {
       if (usuario.rol !== "ADMIN" && usuario.departamento) {
         whereContexto.departamento = usuario.departamento;
       }
-      if (usuario.rol !== "ADMIN" && usuario.rol !== "GERENCIA" && usuario.linea) {
-        whereContexto.linea = usuario.linea;
+      if (usuario.rol !== "ADMIN" && usuario.rol !== "GERENCIA" && usuario.lineas.length > 0) {
+        whereContexto.linea = { in: usuario.lineas };
       }
 
       contextoEjecutivo = await prisma.tarea.findMany({

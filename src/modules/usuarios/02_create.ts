@@ -63,6 +63,7 @@ export const crearUsuario = async (req: Request, res: Response) => {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
+    const lineaFinal = Array.isArray(linea) ? linea.join(',') : (linea || null);
 
     const nuevoUsuario = await prisma.usuario.create({
       data: {
@@ -72,7 +73,7 @@ export const crearUsuario = async (req: Request, res: Response) => {
         password: hashedPassword,
         rol: rol as Rol,
         departamento: departamento as Departamento | null,
-        linea: linea as string | null,
+        linea: lineaFinal,
         imagen: imagenUrl,
       },
       select: { id: true, username: true, email: true, rol: true, nombre: true, departamento: true, linea: true, imagen: true },
@@ -84,7 +85,12 @@ export const crearUsuario = async (req: Request, res: Response) => {
       `Creó usuario: ${usernameFinal} (${rol})`
     );
 
-    return res.status(201).json({ status: "success", data: nuevoUsuario });
+    const dataFinal = {
+      ...nuevoUsuario,
+      lineas: nuevoUsuario.linea ? nuevoUsuario.linea.split(',') : []
+    };
+
+    return res.status(201).json({ status: "success", data: dataFinal });
   } catch (error) {
     await registrarError("CREAR_USUARIO_ERROR", req.user?.id || null, error);
     return res.status(500).json({ error: "Error al crear usuario" });
