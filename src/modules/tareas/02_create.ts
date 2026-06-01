@@ -255,6 +255,12 @@ export const crearTarea = async (
             clasificacion: t.clasificacion,
           })),
         });
+
+      if (minutaId) {
+        getIO()
+          .to(`minuta_${minutaId}`)
+          .emit("minuta:entries_saved", { minutaId });
+      }
     } catch (_) {}
 
     return res.status(201).json({
