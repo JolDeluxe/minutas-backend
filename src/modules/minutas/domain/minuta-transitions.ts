@@ -1,5 +1,6 @@
 import { EstadoMinuta, TipoEventoEntrada } from "@prisma/client";
 import { prisma } from "../../../db";
+import { getIO } from "../../../utils/socket";
 
 type TransitionsMatrix = {
   [key in EstadoMinuta]: EstadoMinuta[];
@@ -84,4 +85,20 @@ export const transitionMinutaStatus = async (
       usuarioId: userId,
     },
   });
+
+  // Emitir evento de socket de cambio de estado
+  try {
+    const minutaActualizada = await prisma.minuta.findUnique({
+      where: { id: minutaId },
+    });
+    if (minutaActualizada) {
+      const io = getIO();
+      io.to(`minuta_${minutaId}`).emit("minuta:estado_actualizado", {
+        minutaId,
+        minuta: minutaActualizada,
+      });
+    }
+  } catch (err) {
+    console.error("Error al emitir socket de cambio de estado:", err);
+  }
 };

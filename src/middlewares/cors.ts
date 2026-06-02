@@ -5,14 +5,22 @@ const whitelist = [
    "http://localhost:5173",
    "http://localhost:5174",
    "http://localhost:3000",
-   "http://localhost:5000", // Añadido por si acaso
-   "http://192.168.137.1:5000", // Añadido para tu red
-   "http://200.1.0.72:5000", // Añadido para tu red
+   "http://localhost:5000",
+   "http://192.168.137.1:5000",
+   "http://200.1.0.72:5000",
+   "https://diseno-minutas.netlify.app", // Tu URL de Netlify
    ];
 
 const corsOptions: cors.CorsOptions = {
   origin: (origin, callback) => {
-    if (env.NODE_ENV === "development" || !origin || whitelist.includes(origin)) {
+    // Permitir si no hay origen (como apps móviles o herramientas de test)
+    // o si está en la whitelist o si es un subdominio de netlify
+    if (
+      !origin || 
+      env.NODE_ENV === "development" || 
+      whitelist.includes(origin) ||
+      origin.endsWith(".netlify.app")
+    ) {
       callback(null, true);
     } else {
       console.error(`❌ Bloqueado por CORS: ${origin}`);

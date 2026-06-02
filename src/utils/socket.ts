@@ -22,7 +22,7 @@ type LiveDraftRoom = {
     entries: Map<string, LiveDraftEntry>;
 };
 
-const liveDraftRooms = new Map<string, LiveDraftRoom>();
+export const liveDraftRooms = new Map<string, LiveDraftRoom>();
 
 const getRoomName = (minutaId: number | string) => `minuta_${minutaId}`;
 
@@ -61,6 +61,9 @@ export const initSocket = (httpServer: HttpServer): Server => {
             origin: "*",
             methods: ["GET", "POST"],
         },
+        transports: ["websocket"], // ← CRÍTICO: omitir polling
+        pingTimeout: 60000,
+        pingInterval: 25000,
     });
 
     io.on("connection", (socket) => {

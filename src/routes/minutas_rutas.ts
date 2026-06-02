@@ -12,6 +12,7 @@ import { cancelarMinuta } from "../modules/minutas/07_cancel";
 import { reabrirMinuta } from "../modules/minutas/08_reopen";
 import { finalizarMinuta } from "../modules/minutas/09_finish";
 import { generarPdfPorArea } from "../modules/minutas/10_generate-pdf-area";
+import { consolidarBorradores } from "../modules/minutas/11_consolidar-borradores";
 
 const router = Router();
 
@@ -38,6 +39,7 @@ router.post("/:id/iniciar", validate(minutaIdSchema),    iniciarMinuta);
 router.post("/:id/cancelar", validate(minutaIdSchema),   cancelarMinuta);
 router.patch("/:id/reabrir", validate(minutaIdSchema),   reabrirMinuta);
 router.post("/:id/finalizar", validate(minutaIdSchema),  finalizarMinuta);
+router.post("/:id/consolidar", validate(minutaIdSchema), consolidarBorradores);
 
 // ─── RUTA BASE POR ID (Atrapa todo lo demás) ───
 // GET  /api/minutas/:id

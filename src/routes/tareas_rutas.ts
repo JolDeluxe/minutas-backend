@@ -25,7 +25,7 @@ import { addImagenTarea, deleteImagenTarea } from "../modules/tareas/07_imagenes
 import { generarPdfTarea }   from "../modules/tareas/08_generate-pdf";
 import { createNotaGeneral, createTareaNota, updateTareaNota, deleteTareaNota } from "../modules/tareas/10_notas";
 import { toggleNotificado }  from "../modules/tareas/11_toggle-notificado";
-
+import { uploadBorradorImagen } from "../modules/tareas/12_borrador-imagen";
 
 const router = Router();
 
@@ -72,5 +72,8 @@ router.delete("/notas/tarea/:id", deleteTareaNota);
 
 // ── NOTIFICACIÓN (solo ADMIN) ──
 router.patch("/:id/notificado", validate(tareaIdSchema), toggleNotificado);
+
+// ── BORRADOR IMAGEN ──
+router.post("/borrador/imagen", upload.single("imagen"), uploadBorradorImagen);
 
 export default router;
