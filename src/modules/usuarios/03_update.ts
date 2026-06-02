@@ -34,8 +34,9 @@ export const updateUsuario = async (req: Request, res: Response) => {
         if (usuarioActual.imagen) {
           deleteImageByUrl(usuarioActual.imagen).catch(console.error);
         }
-      } catch {
-        return res.status(500).json({ error: "Error al procesar la imagen." });
+      } catch (uploadError) {
+        await registrarError("EDITAR_USUARIO_UPLOAD", solicitante.id, uploadError);
+        return res.status(500).json({ status: "error", message: "Error al procesar la imagen." });
       }
     }
 

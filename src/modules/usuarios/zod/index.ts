@@ -111,7 +111,6 @@ export const updateUsuarioSchema = z.object({
         z.array(z.string()).nullable().optional()
       ),
     })
-    .strict(),
 });
 
 export const patchUsuarioSchema = z.object({

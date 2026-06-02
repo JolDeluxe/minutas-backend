@@ -16,19 +16,27 @@ cloudinary.config({
 
 // --- FUNCIÓN RECUPERADA: Para las fotos de perfil de usuario ---
 export const uploadUserProfileImage = async (buffer: Buffer): Promise<string> => {
-  const dataUri = `data:image/jpeg;base64,${buffer.toString("base64")}`;
-
-  const result = await cloudinary.uploader.upload(dataUri, {
-    folder: "TRACE/Usuarios", // Lo dejo en su carpeta original, o cámbialo si lo deseas
-    resource_type: "image",
-    transformation: [
-      { width: 500, height: 500, crop: "thumb", gravity: "face" },
-      { quality: "auto:good" },
-      { fetch_format: "auto" },
-    ],
+  return new Promise((resolve, reject) => {
+    const uploadStream = cloudinary.uploader.upload_stream(
+      {
+        folder: "TRACE/Usuarios",
+        resource_type: "image",
+        transformation: [
+          { width: 500, height: 500, crop: "thumb", gravity: "face" },
+          { quality: "auto:good" },
+          { fetch_format: "auto" },
+        ],
+      },
+      (error, result) => {
+        if (error || !result) {
+          console.error(`[Cloudinary] Error en uploadUserProfileImage:`, error);
+          return reject(error ?? new Error("Cloudinary upload_stream: sin resultado"));
+        }
+        resolve(result.secure_url);
+      }
+    );
+    uploadStream.end(buffer);
   });
-
-  return result.secure_url;
 };
 
 // ── FIX: Usa upload_stream (igual que uploadPdfDocument) ──────────────────────
