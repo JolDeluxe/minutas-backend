@@ -81,6 +81,7 @@ export const login = async (req: Request, res: Response) => {
         linea: usuario.linea,
         lineas: usuario.linea ? usuario.linea.split(',') : [],
         mustChangePassword: usuario.mustChangePassword,
+        imagen: usuario.imagen,
       },
     });
   } catch (error) {

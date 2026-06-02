@@ -26,7 +26,7 @@ export const toggleNotificado = async (req: Request, res: Response) => {
 
     const ahora = new Date();
     const yaNotificado = tarea.notificadoAt !== null;
-
+ 
     const actualizada = await prisma.tarea.update({
       where: { id },
       data: { notificadoAt: yaNotificado ? null : ahora },
