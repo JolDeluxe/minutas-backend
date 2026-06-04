@@ -116,13 +116,16 @@ export const crearTarea = async (
 
       const imagenesValidas = imagenesData.filter((img): img is { url: string; publicId: string; orden: number } => img !== null);
 
-      const tareaId = await prisma.$transaction(async (tx) => {
+      const tareaIds = await prisma.$transaction(async (tx) => {
         let departamento: Departamento = req.user!.departamento ?? "DISENO";
         if (req.user!.rol === "ADMIN") {
           departamento = tareaInput.area === "MARKETING" ? "MARKETING" : "DISENO";
         }
 
         const tipoEntrada = tareaInput.tipo ?? TipoEntrada.SIN_ORGANIZAR;
+        const responsablesIds = tareaInput.responsables ?? [];
+        const esMultiResponsable = tipoEntrada === TipoEntrada.TAREA && responsablesIds.length > 1;
+        const organizadoAt = esMultiResponsable ? new Date() : null;
 
         const nueva = await tx.tarea.create({
           data: {
@@ -138,6 +141,8 @@ export const crearTarea = async (
             tipo: tipoEntrada,
             estado: tareaInput.estado ?? (tipoEntrada === TipoEntrada.TAREA ? EstadoTarea.PENDIENTE : null),
             alcanceRecordatorio: tareaInput.alcanceRecordatorio ?? null,
+            organizadoAt: organizadoAt,
+            organizadoPorId: esMultiResponsable ? usuarioId : null,
 
             imagenes: {
               create: imagenesValidas,
@@ -156,29 +161,91 @@ export const crearTarea = async (
           },
         });
 
-        if (
-          tareaInput.responsables &&
-          tareaInput.responsables.length > 0
-        ) {
-          await tx.tareaAsignacion.createMany({
-            data: tareaInput.responsables.map(
-              (uid) => ({
+        const createdIds = [nueva.id];
+
+        if (responsablesIds.length > 0) {
+          if (esMultiResponsable) {
+            // Asignar el primer responsable a la tarea principal
+            await tx.tareaAsignacion.create({
+              data: {
                 tareaId: nueva.id,
-                usuarioId: uid,
+                usuarioId: responsablesIds[0]!,
                 asignadoPorId: usuarioId,
-              })
-            ),
-            skipDuplicates: true,
-          });
+              }
+            });
+
+            // Crear copias para los otros responsables
+            for (let i = 1; i < responsablesIds.length; i++) {
+              const clon = await tx.tarea.create({
+                data: {
+                  descripcion: tareaInput.descripcion,
+                  creadoPorId: usuarioId,
+                  minutaId: tareaInput.minutaId ?? null,
+                  departamento: departamento,
+                  area: (tareaInput.area as Area | undefined) ?? Area.DISENO,
+                  prioridad: tareaInput.prioridad ?? null,
+                  linea: (tareaInput.linea as string | undefined) ?? null,
+                  clasificacion: tareaInput.clasificacion ?? "OTROS",
+                  fechaVencimiento: fechaVenc,
+                  tipo: tipoEntrada,
+                  estado: tareaInput.estado ?? EstadoTarea.PENDIENTE,
+                  alcanceRecordatorio: tareaInput.alcanceRecordatorio ?? null,
+                  organizadoAt: organizadoAt,
+                  organizadoPorId: usuarioId,
+
+                  imagenes: {
+                    create: imagenesValidas.map(img => ({
+                      url: img.url,
+                      publicId: img.publicId,
+                      orden: img.orden,
+                    })),
+                  },
+
+                  notas:
+                    tareaInput.notas &&
+                    tareaInput.notas.length > 0
+                      ? {
+                          create: tareaInput.notas.map((n) => ({
+                            contenido: n.contenido,
+                            creadoPorId: usuarioId,
+                          })),
+                        }
+                      : undefined,
+                }
+              });
+
+              await tx.tareaAsignacion.create({
+                data: {
+                  tareaId: clon.id,
+                  usuarioId: responsablesIds[i]!,
+                  asignadoPorId: usuarioId,
+                }
+              });
+
+              createdIds.push(clon.id);
+            }
+          } else {
+            // Flujo normal (1 responsable o no es TAREA)
+            await tx.tareaAsignacion.createMany({
+              data: responsablesIds.map(
+                (uid) => ({
+                  tareaId: nueva.id,
+                  usuarioId: uid,
+                  asignadoPorId: usuarioId,
+                })
+              ),
+              skipDuplicates: true,
+            });
+          }
         }
 
-        return nueva.id;
+        return createdIds;
       });
 
-      const tareaCompleta =
-        await prisma.tarea.findUnique({
+      for (const tId of tareaIds) {
+        const tareaCompleta = await prisma.tarea.findUnique({
           where: {
-            id: tareaId,
+            id: tId,
           },
           include: {
             imagenes: {
@@ -224,15 +291,19 @@ export const crearTarea = async (
           },
         });
 
-      tareasCompletasResp.push(tareaCompleta);
-
-      if (tareaInput.responsables && tareaInput.responsables.length > 0) {
-        await notificarAsignacion(
-          tareaId,
-          tareaInput.responsables,
-          tareaInput.descripcion,
-          (tareaInput.linea as string | undefined) ?? null
-        );
+        if (tareaCompleta) {
+          tareasCompletasResp.push(tareaCompleta);
+          
+          const asig = tareaCompleta.asignaciones?.[0];
+          if (asig) {
+            await notificarAsignacion(
+              tareaCompleta.id,
+              [asig.usuarioId],
+              tareaCompleta.descripcion,
+              tareaCompleta.linea
+            );
+          }
+        }
       }
     }
 

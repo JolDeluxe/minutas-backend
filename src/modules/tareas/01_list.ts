@@ -112,27 +112,79 @@ export const listTareas = async (
     const ultimaJuntaId = ultimasDosJuntas[0]?.id ?? null;
     const juntaAnteriorId = ultimasDosJuntas[1]?.id ?? null;
 
+    const groupedParams = tareas
+      .filter((t: any) => t.tipo === TipoEntrada.TAREA && t.minutaId && t.organizadoAt)
+      .map((t: any) => ({ minutaId: t.minutaId, organizadoAt: t.organizadoAt }));
+
+    const uniqueGroups = Array.from(new Set(groupedParams.map((p) => JSON.stringify(p)))).map((p) => JSON.parse(p as string));
+
+    let hermanasRaw: any[] = [];
+    if (uniqueGroups.length > 0) {
+      hermanasRaw = await prisma.tarea.findMany({
+        where: {
+          AND: [
+            {
+              OR: uniqueGroups.map((g: any) => ({
+                minutaId: g.minutaId,
+                organizadoAt: new Date(g.organizadoAt),
+                tipo: TipoEntrada.TAREA,
+              })),
+            },
+            {
+              estado: { notIn: [EstadoTarea.CANCELADA] },
+              tipo: { notIn: [TipoEntrada.DESCARTADA] },
+            }
+          ]
+        },
+        select: {
+          id: true,
+          minutaId: true,
+          organizadoAt: true,
+          asignaciones: {
+            include: { usuario: { select: USUARIO_SELECT_BASICO } },
+          },
+        },
+      });
+    }
+
     const now = new Date();
-    const tareasConMeta = tareas.map((t: any) => ({
-      ...t,
-      isOverdue:
-        t.fechaVencimiento &&
-        new Date(t.fechaVencimiento) < now &&
-        !['CERRADA', 'CANCELADA'].includes(t.estado),
-      responsables: t.asignaciones?.map((a: any) => ({
-        id: a.usuario?.id,
-        nombre: a.usuario?.nombre,
-        imagen: a.usuario?.imagen,
-        rol: a.usuario?.rol,
-      })) ?? [],
-      minuta: t.minuta
-        ? {
-            ...t.minuta,
-            isJuntaActual: t.minuta.id === ultimaJuntaId,
-            isJuntaAnterior: t.minuta.id === juntaAnteriorId,
-          }
-        : null,
-    }));
+    const tareasConMeta = tareas.map((t: any) => {
+      let _grupoContext = null;
+      if (t.tipo === TipoEntrada.TAREA && t.minutaId && t.organizadoAt) {
+        const hermanas = hermanasRaw.filter((h: any) => h.minutaId === t.minutaId && new Date(h.organizadoAt).getTime() === new Date(t.organizadoAt).getTime());
+        if (hermanas.length > 1) {
+          const otrosResponsables = hermanas
+            .filter((h: any) => h.id !== t.id)
+            .flatMap((h: any) => h.asignaciones.map((a: any) => a.usuario));
+          _grupoContext = {
+            total: hermanas.length,
+            otrosResponsables,
+          };
+        }
+      }
+
+      return {
+        ...t,
+        isOverdue:
+          t.fechaVencimiento &&
+          new Date(t.fechaVencimiento) < now &&
+          !['CERRADA', 'CANCELADA'].includes(t.estado),
+        responsables: t.asignaciones?.map((a: any) => ({
+          id: a.usuario?.id,
+          nombre: a.usuario?.nombre,
+          imagen: a.usuario?.imagen,
+          rol: a.usuario?.rol,
+        })) ?? [],
+        minuta: t.minuta
+          ? {
+              ...t.minuta,
+              isJuntaActual: t.minuta.id === ultimaJuntaId,
+              isJuntaAnterior: t.minuta.id === juntaAnteriorId,
+            }
+          : null,
+        _grupoContext,
+      };
+    });
 
     return res.json({
       status: "success",

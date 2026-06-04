@@ -60,13 +60,35 @@ export const deleteTarea = async (req: Request, res: Response) => {
     // Si la entrada ya estaba formalizada como TAREA, la pasamos a CANCELADA.
     // Si no, la pasamos a tipo DESCARTADA.
     const isTareaFormalizada = tarea.tipo === TipoEntrada.TAREA;
+    const deleteGroup = req.query.all === 'true';
 
-    await prisma.tarea.update({
-      where: { id },
-      data: {
-        ...(isTareaFormalizada ? { estado: EstadoTarea.CANCELADA } : { tipo: TipoEntrada.DESCARTADA, estado: null }),
-        cerradoAt: new Date(),
-      },
+    let hermanasAfectadas = 0;
+
+    await prisma.$transaction(async (tx) => {
+      // Cancelar / descartar la tarea principal
+      await tx.tarea.update({
+        where: { id },
+        data: {
+          ...(isTareaFormalizada ? { estado: EstadoTarea.CANCELADA } : { tipo: TipoEntrada.DESCARTADA, estado: null }),
+          cerradoAt: new Date(),
+        },
+      });
+
+      // ── Cancelar hermanas del grupo (mismo minutaId + organizadoAt) ──────
+      // Solo aplica a tareas ya formalizadas que pertenezcan a un grupo dividido.
+      if (isTareaFormalizada && tarea.minutaId && tarea.organizadoAt && deleteGroup) {
+        const resUpdate = await tx.tarea.updateMany({
+          where: {
+            minutaId: tarea.minutaId,
+            organizadoAt: tarea.organizadoAt,
+            tipo: TipoEntrada.TAREA,
+            id: { not: id },
+            estado: { notIn: [EstadoTarea.CANCELADA] },
+          },
+          data: { estado: EstadoTarea.CANCELADA, cerradoAt: new Date() },
+        });
+        hermanasAfectadas = resUpdate.count;
+      }
     });
 
     // Reevaluar estado de la minuta al eliminar
@@ -75,7 +97,7 @@ export const deleteTarea = async (req: Request, res: Response) => {
     }
 
     // 4. Responder inmediatamente a la UI
-    res.status(200).json({ message: "Entrada descartada correctamente." });
+    res.status(200).json({ message: "Entrada descartada correctamente.", hermanasAfectadas });
 
     // 5. Registrar en bitácora en segundo plano (NO eliminamos imágenes porque es un soft delete)
     process.nextTick(async () => {
