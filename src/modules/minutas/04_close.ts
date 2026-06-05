@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 import { prisma } from "../../db";
-import { EstadoMinuta, EstadoTarea } from "@prisma/client";
+import { EstadoMinuta, EstadoTarea, TipoEntrada } from "@prisma/client";
 import { registrarAccion, registrarError } from "../../utils/logger";
 import type { MinutaIdParams } from "./zod";
 import { transitionMinutaStatus } from "./domain/minuta-transitions";
@@ -29,6 +29,20 @@ export const cerrarMinuta = async (req: Request, res: Response) => {
         status: "success",
         data: minuta,
         message: "La minuta ya se encontraba cerrada previamente",
+      });
+    }
+
+    // Validar que no existan tareas sin organizar (borradores o capturas pendientes)
+    const hasUnorganized = await prisma.tarea.count({
+      where: {
+        minutaId: id,
+        tipo: TipoEntrada.SIN_ORGANIZAR,
+      },
+    });
+
+    if (hasUnorganized > 0) {
+      return res.status(400).json({
+        error: "No se puede cerrar la minuta porque aún existen tareas sin organizar (borradores o capturas pendientes de clasificar).",
       });
     }
 

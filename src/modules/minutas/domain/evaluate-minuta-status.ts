@@ -39,10 +39,13 @@ export const evaluateMinutaStatus = async (
 
   // Filtrar solo entradas internas (las externas no bloquean la minuta)
   const entradasInternas = entradas.filter((e) => {
+    // Si aún no está organizada (es borrador/sin organizar), se considera interna/bloqueante
+    if (e.tipo === TipoEntrada.SIN_ORGANIZAR) return true;
+
     // Si no tiene area, se considera interna (pendiente de clasificar)
     if (!e.area) return true;
     
-    // Si tiene area, comparamos con el departamento de la minuta
+    // Si tiene area y ya está organizada, comparamos con el departamento de la minuta
     // Solo es interna si el area coincide exactamente con el departamento
     return (e.area as string) === (departamento as string);
   });

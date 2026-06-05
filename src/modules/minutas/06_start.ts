@@ -31,6 +31,10 @@ export const iniciarMinuta = async (req: Request, res: Response) => {
       return res.status(403).json({ error: "No tienes permiso para acceder a esta minuta." });
     }
 
+    if (minuta.estado === EstadoMinuta.EN_CURSO) {
+      return res.status(200).json({ status: "success", data: minuta, message: "La minuta ya estaba iniciada previamente" });
+    }
+
     if (minuta.estado !== EstadoMinuta.PROGRAMADA) {
       return res.status(400).json({ error: "Solo se pueden iniciar minutas PROGRAMADAS" });
     }
