@@ -161,7 +161,23 @@ export const getMinutaById = async (req: Request, res: Response) => {
       }
     }
     
-    const resumenOperativo = { ...resumen, totalValidas };
+    const countActiveOverall = await prisma.tarea.count({
+      where: {
+        minutaId: id,
+        OR: [
+          {
+            tipo: { in: [TipoEntrada.SIN_ORGANIZAR, TipoEntrada.RECORDATORIO, TipoEntrada.POLITICA] }
+          },
+          {
+            tipo: TipoEntrada.TAREA,
+            estado: { notIn: [EstadoTarea.CANCELADA, EstadoTarea.DESCARTADA] }
+          }
+        ]
+      }
+    });
+    const hasActiveTasks = countActiveOverall > 0;
+
+    const resumenOperativo = { ...resumen, totalValidas, hasActiveTasks };
 
     let contextoEjecutivo: any[] = [];
     if (minuta.minutaAnteriorId) {

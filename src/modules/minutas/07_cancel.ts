@@ -13,7 +13,7 @@ export const cancelarMinuta = async (req: Request, res: Response) => {
       include: {
         creadoPor: { select: { departamento: true } },
         tareas: {
-          select: { tipo: true }
+          select: { tipo: true, estado: true }
         }
       }
     });
@@ -30,11 +30,19 @@ export const cancelarMinuta = async (req: Request, res: Response) => {
       return res.status(400).json({ error: "La minuta ya está cancelada" });
     }
 
-    // Verificar tareas
-    const tareasValidas = minuta.tareas.filter((t: any) => t.tipo !== "DESCARTADA");
+    // Verificar tareas activas o pendientes de descartar
+    const tareasActivas = minuta.tareas.filter((t: any) => {
+      if (t.tipo === "DESCARTADA") return false;
+      if (t.tipo === "TAREA") {
+        return t.estado !== "CANCELADA" && t.estado !== "DESCARTADA";
+      }
+      return true;
+    });
     
-    if (tareasValidas.length > 0) {
-      return res.status(400).json({ error: "No se puede cancelar una minuta con tareas activas. Descarte las tareas primero." });
+    if (tareasActivas.length > 0) {
+      return res.status(400).json({ 
+        error: "No se puede cancelar una minuta con tareas activas o pendientes de descartar. Descarte las tareas primero." 
+      });
     }
 
     const updated = await prisma.minuta.update({

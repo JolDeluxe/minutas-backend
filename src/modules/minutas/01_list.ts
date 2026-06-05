@@ -107,6 +107,16 @@ export const listarMinutas = async (req: Request, res: Response) => {
         }
       }
 
+      // Count active entries
+      const activeEntries = tareas.filter((t: any) => {
+        if (t.tipo === TipoEntrada.DESCARTADA) return false;
+        if (t.tipo === TipoEntrada.TAREA) {
+          return t.estado !== EstadoTarea.CANCELADA && t.estado !== EstadoTarea.DESCARTADA;
+        }
+        return true;
+      });
+      const hasActiveTasks = activeEntries.length > 0;
+
       // Remove raw tareas from response (only keep _count and resumen)
       const { tareas: _tareas, ...minutaSinTareas } = m;
 
@@ -128,6 +138,7 @@ export const listarMinutas = async (req: Request, res: Response) => {
           porcentajeCompletado: totalTareasOperativas > 0
             ? Math.round((cerradas / totalTareasOperativas) * 100)
             : 0,
+          hasActiveTasks,
         },
       };
     });
