@@ -61,9 +61,8 @@ export const initSocket = (httpServer: HttpServer): Server => {
             origin: "*",
             methods: ["GET", "POST"],
         },
-        transports: ["websocket", "polling"], // Habilitar websocket y polling para bypass de firewall
         pingTimeout: 10000,
-        pingInterval: 15000, // Enviar keep-alive cada 15 segundos
+        pingInterval: 15000,
     });
 
     io.on("connection", (socket) => {
