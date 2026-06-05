@@ -17,6 +17,7 @@ export const cerrarMinuta = async (req: Request, res: Response) => {
 
     if (!minuta) {
       return res.status(404).json({ error: "Minuta no encontrada" });
+
     }
 
     if (req.user!.rol !== "ADMIN" && req.user!.departamento && minuta.departamento !== req.user!.departamento) {
@@ -24,7 +25,11 @@ export const cerrarMinuta = async (req: Request, res: Response) => {
     }
 
     if (minuta.estado === EstadoMinuta.CERRADA) {
-      return res.status(400).json({ error: "La minuta ya se encuentra cerrada" });
+      return res.json({
+        status: "success",
+        data: minuta,
+        message: "La minuta ya se encontraba cerrada previamente",
+      });
     }
 
     await transitionMinutaStatus(id, EstadoMinuta.CERRADA, usuarioId);

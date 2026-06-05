@@ -25,6 +25,18 @@ export const finalizarMinuta = async (req: Request, res: Response) => {
       return res.status(403).json({ error: "No tienes permiso para acceder a esta minuta." });
     }
 
+    if (
+      minuta.estado === EstadoMinuta.EN_ORGANIZACION ||
+      minuta.estado === EstadoMinuta.ACTIVA ||
+      minuta.estado === EstadoMinuta.CERRADA
+    ) {
+      return res.json({
+        status: "success",
+        data: minuta,
+        message: "La junta ya había sido finalizada previamente",
+      });
+    }
+
     if (minuta.estado !== EstadoMinuta.EN_CURSO) {
       return res.status(400).json({ error: "Solo se pueden finalizar juntas EN_CURSO" });
     }
