@@ -164,15 +164,8 @@ export const getMinutaById = async (req: Request, res: Response) => {
     const countActiveOverall = await prisma.tarea.count({
       where: {
         minutaId: id,
-        OR: [
-          {
-            tipo: { in: [TipoEntrada.SIN_ORGANIZAR, TipoEntrada.RECORDATORIO, TipoEntrada.POLITICA] }
-          },
-          {
-            tipo: TipoEntrada.TAREA,
-            estado: { notIn: [EstadoTarea.CANCELADA, EstadoTarea.DESCARTADA] }
-          }
-        ]
+        tipo: TipoEntrada.TAREA,
+        estado: { in: [EstadoTarea.PENDIENTE, EstadoTarea.EN_REVISION] }
       }
     });
     const hasActiveTasks = countActiveOverall > 0;

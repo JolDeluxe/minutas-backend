@@ -30,13 +30,9 @@ export const cancelarMinuta = async (req: Request, res: Response) => {
       return res.status(400).json({ error: "La minuta ya está cancelada" });
     }
 
-    // Verificar tareas activas o pendientes de descartar
+    // Verificar tareas activas (únicamente tareas en PENDIENTE o EN_REVISION)
     const tareasActivas = minuta.tareas.filter((t: any) => {
-      if (t.tipo === "DESCARTADA") return false;
-      if (t.tipo === "TAREA") {
-        return t.estado !== "CANCELADA" && t.estado !== "DESCARTADA";
-      }
-      return true;
+      return t.tipo === "TAREA" && (t.estado === "PENDIENTE" || t.estado === "EN_REVISION");
     });
     
     if (tareasActivas.length > 0) {
