@@ -1,14 +1,40 @@
 import type { Request, Response } from "express";
-import { PrismaClient, EstadoTarea, TipoEntrada, Area } from "@prisma/client";
-import { getIO } from "../../utils/socket";
+import { EstadoTarea, TipoEntrada, Area } from "@prisma/client";
+import { prisma } from "../../db";
+import { getIO, liveDraftRooms } from "../../utils/socket";
 
-const prisma = new PrismaClient();
+type ConsolidatedImage = {
+    url: string;
+    publicId: string;
+    orden: number;
+    tipo: "CAPTURA";
+};
 
-// Necesitamos importar el mapa de memoria de sockets si no está expuesto.
-// Como liveDraftRooms está en socket.ts y no es exportado directamente, 
-// podríamos necesitar acceder al store o emitir un evento que lo limpie,
-// o modificar socket.ts para exportar un getter.
-import { liveDraftRooms } from "../../utils/socket";
+const extractCloudinaryPublicId = (url: string): string | null => {
+    if (!url || !url.includes("/upload/")) return null;
+    const [, uploadedPath] = url.split("/upload/");
+    if (!uploadedPath) return null;
+    return uploadedPath.replace(/^v\d+\//, "").replace(/\.[^/.]+$/, "");
+};
+
+const buildImagenesCreate = (images: any[] | undefined): ConsolidatedImage[] => {
+    return (images ?? [])
+        .map((img: any, index: number) => {
+            const url = img?.url ?? img?.secure_url;
+            const publicId = img?.publicId ?? img?.public_id ?? extractCloudinaryPublicId(url);
+
+            if (!url || !publicId) return null;
+
+            return {
+                url,
+                publicId,
+                orden: index + 1,
+                tipo: "CAPTURA",
+            };
+        })
+        .filter((img): img is ConsolidatedImage => img !== null)
+        .slice(0, 3);
+};
 
 export const consolidarBorradores = async (req: Request, res: Response): Promise<void> => {
     const { id } = req.params; // minutaId
@@ -19,13 +45,17 @@ export const consolidarBorradores = async (req: Request, res: Response): Promise
         const room = liveDraftRooms.get(key);
         
         if (!room || room.entries.size === 0) {
-            res.status(200).json({ success: true, message: "No hay borradores para consolidar", count: 0 });
+            res.status(200).json({
+                status: "success",
+                message: "No hay borradores para consolidar",
+                data: { count: 0 },
+            });
             return;
         }
 
         const usuarioId = req.user?.id;
         if (!usuarioId) {
-            res.status(401).json({ success: false, error: "No autorizado" });
+            res.status(401).json({ status: "error", message: "No autorizado" });
             return;
         }
 
@@ -44,13 +74,11 @@ export const consolidarBorradores = async (req: Request, res: Response): Promise
                 linea: data.linea || null,
                 clasificacion: data.clasificacion || "OTROS",
                 tipo: (["SIN_ORGANIZAR", "TAREA", "RECORDATORIO", "POLITICA", "DESCARTADA"].includes(data.tipo) ? data.tipo : "SIN_ORGANIZAR") as TipoEntrada,
-                estado: EstadoTarea.PENDIENTE,
+                estado: data.tipo === "TAREA" ? EstadoTarea.PENDIENTE : null,
                 creadoPorId: finalCreadoPorId,
                 // Procesamiento de imágenes (ya subidas y seguras)
                 imagenes: {
-                    create: data._localImages
-                        ?.filter((img: any) => img.secure_url) // Solo las que se subieron con éxito
-                        ?.map((img: any) => ({ url: img.secure_url })) || []
+                    create: buildImagenesCreate(data._localImages),
                 },
                 // Procesamiento de notas
                 notas: {
@@ -78,16 +106,16 @@ export const consolidarBorradores = async (req: Request, res: Response): Promise
         });
 
         res.status(200).json({
-            success: true,
-            count: tareasACrear.length,
-            message: "Borradores consolidados exitosamente"
+            status: "success",
+            message: "Borradores consolidados exitosamente",
+            data: { count: tareasACrear.length },
         });
 
     } catch (error) {
         console.error("Error al consolidar borradores:", error);
         res.status(500).json({
-            success: false,
-            error: "Error interno al consolidar"
+            status: "error",
+            message: "Error interno al consolidar",
         });
     }
 };

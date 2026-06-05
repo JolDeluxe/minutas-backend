@@ -1,4 +1,4 @@
-import { prisma } from './src/db';
+import { prisma } from '../db';
 
 async function run() {
   const user5 = await prisma.usuario.findUnique({ where: { id: 5 } });

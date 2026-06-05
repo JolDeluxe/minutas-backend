@@ -2,6 +2,7 @@ import cron from "node-cron";
 import { prisma } from "../db";
 import { EstadoTarea } from "@prisma/client";
 import { evaluarEstadoMinuta } from "../modules/tareas/helpers";
+import { cleanupOldTaskImages } from "./task-image-cleanup";
 
 export const iniciarTareasProgramadas = () => {
   console.log("⏳ Tareas programadas (CRON) inicializadas.");
@@ -44,6 +45,26 @@ export const iniciarTareasProgramadas = () => {
       }
     } catch (error) {
       console.error("❌ Error ejecutando el CRON de tareas:", error);
+    }
+
+    try {
+      const result = await cleanupOldTaskImages(3);
+
+      if (result.processed > 0 || result.errors > 0) {
+        await prisma.bitacora.create({
+          data: {
+            accion: "CRON_LIMPIEZA_IMAGENES_TAREA",
+            detalles: `Procesadas: ${result.processed}, Sustituidas: ${result.replaced}, Errores: ${result.errors}`,
+            usuarioId: null,
+          },
+        });
+      }
+
+      console.log(
+        `✅ CRON imágenes: procesadas=${result.processed}, sustituidas=${result.replaced}, errores=${result.errors}`
+      );
+    } catch (error) {
+      console.error("❌ Error ejecutando limpieza de imágenes de tareas:", error);
     }
   });
 };

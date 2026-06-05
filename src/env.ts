@@ -9,6 +9,7 @@ export const env = createEnv({
     JWT_ACCESS_EXPIRES: z.string().default("15d"),
     JWT_REFRESH_EXPIRES: z.string().default("1y"),
     NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
+    PUBLIC_BASE_URL: z.string().url().optional(),
 
     SYS_ADMIN_USER: z.string().min(1).default("ADMIN"),
     SYS_ADMIN_PASS: z.string().min(1),

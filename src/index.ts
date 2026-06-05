@@ -1,6 +1,7 @@
 import express from "express";
 import http from "http";
 import morgan from "morgan";
+import path from "path";
 import { env } from "./env";
 import { corsMiddleware } from "./middlewares/cors";
 import { iniciarTareasProgramadas } from "./utils/scheduler";
@@ -27,6 +28,7 @@ const httpServer = http.createServer(app);
 app.use(corsMiddleware);
 app.use(express.json());
 app.use(morgan("dev"));
+app.use(express.static(path.join(process.cwd(), "public")));
 
 app.get("/", (_req, res) => {
   res.send("Minutas Backend: ONLINE 🚀");
