@@ -94,6 +94,18 @@ export const listMinutasSchema = z.object({
   }),
 });
 
+export const updateMinutaSchema = z.object({
+  params: z.object({
+    id: z.coerce.number().int().positive(),
+  }),
+  body: z.object({
+    titulo:       z.string().min(3, "El título debe tener al menos 3 caracteres").max(200).optional(),
+    lineaDefault: z.string().optional().nullable(),
+    fechaProgramada: z.string().datetime({ message: "Fecha programada inválida" }).optional(),
+    departamento: z.enum(["DISENO", "MARKETING"]).optional(),
+  }),
+});
+
 export const minutaIdSchema = z.object({
   params: z.object({
     id: z.coerce.number().int().positive(),
@@ -101,5 +113,6 @@ export const minutaIdSchema = z.object({
 });
 
 export type CreateMinutaInput = z.infer<typeof createMinutaSchema>["body"];
+export type UpdateMinutaInput = z.infer<typeof updateMinutaSchema>["body"];
 export type ListMinutasQuery  = z.infer<typeof listMinutasSchema>["query"];
 export type MinutaIdParams    = z.infer<typeof minutaIdSchema>["params"];

@@ -1,9 +1,10 @@
 import { Router } from "express";
 import { authenticate } from "../middlewares/authenticate";
 import { validate } from "../middlewares/validate";
-import { createMinutaSchema, listMinutasSchema, minutaIdSchema } from "../modules/minutas/zod";
+import { createMinutaSchema, listMinutasSchema, minutaIdSchema, updateMinutaSchema } from "../modules/minutas/zod";
 import { listarMinutas } from "../modules/minutas/01_list";
 import { crearMinuta }   from "../modules/minutas/02_create";
+import { editarMinuta }  from "../modules/minutas/12_update";
 import { getMinutaById } from "../modules/minutas/03_get-by-id";
 import { cerrarMinuta } from "../modules/minutas/04_close";
 import { compararConAnterior } from "../modules/minutas/05_compare";
@@ -22,6 +23,8 @@ router.use(authenticate);
 router.get("/",           validate(listMinutasSchema),   listarMinutas);
 // POST /api/minutas
 router.post("/",          validate(createMinutaSchema),  crearMinuta);
+// PUT  /api/minutas/:id
+router.put("/:id",         validate(updateMinutaSchema),  editarMinuta);
 
 // ─── RUTAS CON SUB-RECURSOS (Deben ir antes que :id) ───
 // GET  /api/minutas/:id/pdf-area/:area
