@@ -36,9 +36,20 @@ export const buildMinutasWhere = (
   // ─────────────────────────────
 
   if (query.q) {
-    where.titulo = {
-      contains: query.q,
-    };
+    const cleanedQ = query.q.trim();
+    // Intenta extraer un ID numérico (ej. 5, #5, MN-005)
+    const idMatch = cleanedQ.match(/^(?:(?:mn|MN)-|#)?0*(\d+)$/i);
+    if (idMatch) {
+      const parsedId = parseInt(idMatch[1]!, 10);
+      where.OR = [
+        { titulo: { contains: cleanedQ } },
+        { id: parsedId }
+      ];
+    } else {
+      where.titulo = {
+        contains: cleanedQ,
+      };
+    }
   }
 
   // ─────────────────────────────

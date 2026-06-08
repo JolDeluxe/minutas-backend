@@ -71,6 +71,9 @@ export const listMinutasSchema = z.object({
         .array(
           z
             .object({
+              id:              z.enum(["asc", "desc"]).optional(),
+              lineaDefault:    z.enum(["asc", "desc"]).optional(),
+              estado:          z.enum(["asc", "desc"]).optional(),
               fecha:           z.enum(["asc", "desc"]).optional(),
               fechaProgramada: z.enum(["asc", "desc"]).optional(),
               fechaRealizada:  z.enum(["asc", "desc"]).optional(),

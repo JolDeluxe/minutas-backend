@@ -238,6 +238,10 @@ export const listTareasSchema = z.object({
         completadoAt: z.enum(["asc", "desc"]).optional(),
         prioridad: z.enum(["asc", "desc"]).optional(),
         estado: z.enum(["asc", "desc"]).optional(),
+        id: z.enum(["asc", "desc"]).optional(),
+        descripcion: z.enum(["asc", "desc"]).optional(),
+        linea: z.enum(["asc", "desc"]).optional(),
+        clasificacion: z.enum(["asc", "desc"]).optional(),
       }).strict()
     ).default([{ createdAt: "desc" }])),
   }),

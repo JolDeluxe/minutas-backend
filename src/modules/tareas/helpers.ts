@@ -95,7 +95,20 @@ export const buildTareasWhere = (
   }
 
   if (query.q) {
-    where.descripcion = { contains: query.q };
+    const cleanedQ = query.q.trim();
+    // Intenta extraer un ID numérico (ej. 12, #12)
+    const idMatch = cleanedQ.match(/^(?:#)?0*(\d+)$/);
+    if (idMatch) {
+      const parsedId = parseInt(idMatch[1]!, 10);
+      and.push({
+        OR: [
+          { descripcion: { contains: cleanedQ } },
+          { id: parsedId }
+        ]
+      });
+    } else {
+      where.descripcion = { contains: cleanedQ };
+    }
   }
 
   if (query.tipo?.length) {
