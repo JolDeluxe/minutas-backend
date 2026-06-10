@@ -18,6 +18,11 @@ export const getMinutaById = async (req: Request, res: Response) => {
         notasGenerales: { orderBy: { createdAt: "desc" } },
         tareas: {
           where: {
+            tipo: { not: TipoEntrada.DESCARTADA },
+            OR: [
+              { estado: { notIn: [EstadoTarea.CANCELADA, EstadoTarea.DESCARTADA] } },
+              { estado: null }
+            ],
             ...(usuario.rol !== "ADMIN" && usuario.departamento ? { departamento: usuario.departamento } : {}),
             // Jefes and Gerencia can see all tasks in the department's minuta (no line filter)
             ...(usuario.rol === "COORDINADOR"
@@ -61,7 +66,14 @@ export const getMinutaById = async (req: Request, res: Response) => {
     let totalEntradas = minuta.tareas.length;
 
     if (usuario.rol === "COORDINADOR") {
-      const whereBase: any = { minutaId: id };
+      const whereBase: any = {
+        minutaId: id,
+        tipo: { not: TipoEntrada.DESCARTADA },
+        OR: [
+          { estado: { notIn: [EstadoTarea.CANCELADA, EstadoTarea.DESCARTADA] } },
+          { estado: null }
+        ]
+      };
       if (usuario.departamento) {
         whereBase.departamento = usuario.departamento;
       }
@@ -142,7 +154,14 @@ export const getMinutaById = async (req: Request, res: Response) => {
 
     let totalValidas = 0;
     if (usuario.rol === "COORDINADOR") {
-      const whereBaseValidas: any = { minutaId: id, tipo: { not: TipoEntrada.DESCARTADA } };
+      const whereBaseValidas: any = {
+        minutaId: id,
+        tipo: { not: TipoEntrada.DESCARTADA },
+        OR: [
+          { estado: { notIn: [EstadoTarea.CANCELADA, EstadoTarea.DESCARTADA] } },
+          { estado: null }
+        ]
+      };
       if (usuario.departamento) {
         whereBaseValidas.departamento = usuario.departamento;
       }
