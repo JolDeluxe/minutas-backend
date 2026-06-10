@@ -79,6 +79,7 @@ export const createTareaNota = async (
         contenido: data.contenido,
         tareaId: data.tareaId,
         creadoPorId: usuarioId,
+        esEntrega: data.esEntrega ?? false,
       },
       include: {
         creadoPor: {

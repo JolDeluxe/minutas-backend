@@ -67,6 +67,7 @@ export const createTareaNotaSchema = z.object({
   body: z.object({
     contenido: z.string().min(1, "El contenido es requerido"),
     tareaId: z.coerce.number().int().positive(),
+    esEntrega: z.boolean().optional(),
   }),
 });
 
@@ -198,6 +199,7 @@ export const listTareasSchema = z.object({
     prioridad: z.preprocess(parseCsv, z.array(z.nativeEnum(Prioridad)).optional()),
     
     minutaId: z.preprocess(pre, z.coerce.number().int().positive().optional()),
+    onlyGeneral: z.preprocess(parseBool, z.boolean().optional()),
     creadoPorId: z.preprocess(pre, z.coerce.number().int().positive().optional()),
     responsableId: z.preprocess(pre, z.coerce.number().int().positive().optional()),
     organizadoPorId: z.preprocess(pre, z.coerce.number().int().positive().optional()),
@@ -206,6 +208,7 @@ export const listTareasSchema = z.object({
     isExternalArea: z.preprocess(parseBool, z.boolean().optional()),
     atrasadas: z.preprocess(parseBool, z.boolean().optional()),
     todo: z.preprocess(parseBool, z.boolean().optional()),
+    notificado: z.preprocess(parseBool, z.boolean().optional()),
     
     periodo: z.enum(["all", "today", "week", "month"]).optional(),
     year: z.preprocess(pre, z.coerce.number().int().min(2020).max(2100).optional()),

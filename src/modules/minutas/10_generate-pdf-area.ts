@@ -85,20 +85,21 @@ const generatePdfDocument = async (
       // Franja inferior dorada
       doc.rect(0, HEADER_H - 4, PW, 4).fill(C.goldBar);
 
-      // Logo — izquierda, centrado verticalmente en el área crema
+      // Logo — derecha
       const logoPath = path.join(process.cwd(), "public", "img", "Grupo_Cuadra.svg");
       if (fs.existsSync(logoPath)) {
         const svg = fs.readFileSync(logoPath, "utf-8");
-        SVGtoPDF(doc, svg, MARGIN, 18, { height: 56 });
+        const logoX = PW - MARGIN - 181.58;
+        SVGtoPDF(doc, svg, logoX, 18, { width: 181.58, height: 56, preserveAspectRatio: "xMidYMid meet" });
       }
 
-      // Texto área — derecha
-      doc.fillColor(C.primary).fontSize(15).font("Helvetica-Bold")
-         .text(areaLabel, 0, 22, { align: "right", width: PW - MARGIN });
-      doc.fillColor(C.muted).fontSize(8).font("Helvetica")
-         .text(`DEPARTAMENTO: ${minuta.departamento ?? "—"}`, 0, 46, { align: "right", width: PW - MARGIN });
-      doc.fillColor(C.brown).fontSize(8).font("Helvetica")
-         .text(`Fecha: ${fechaStr}`, 0, 62, { align: "right", width: PW - MARGIN });
+      // Texto header — izquierda
+      doc.fillColor(C.primary).fontSize(16).font("Helvetica-Bold")
+         .text(areaLabel, MARGIN, 22, { align: "left", width: PW - MARGIN - 200 });
+      doc.fillColor(C.muted).fontSize(9).font("Helvetica")
+         .text(`DEPARTAMENTO: ${minuta.departamento ?? "—"}`, MARGIN, 46, { align: "left", width: PW - MARGIN - 200 });
+      doc.fillColor(C.brown).fontSize(9).font("Helvetica")
+         .text(`Fecha: ${fechaStr}`, MARGIN, 62, { align: "left", width: PW - MARGIN - 200 });
 
       // Resetear cursor al inicio del área de contenido
       doc.x = MARGIN;
@@ -269,7 +270,7 @@ export const generarPdfPorArea = async (req: Request, res: Response) => {
       return res.status(404).json({ error: `No hay tareas para el área ${area}` });
 
     const ds  = fmt(minuta.fechaRealizada ?? minuta.fechaProgramada).replace(/\//g, "-");
-    const filename = `Tareas_${area}_${ds}`; // cloudinary will append .pdf
+    const filename = `Tareas_${area}_${ds}_${Date.now()}`; // cloudinary will append .pdf
 
     console.log(`[Generar PDF] Subiendo a Cloudinary: ${filename}...`);
     

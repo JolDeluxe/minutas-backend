@@ -1,9 +1,28 @@
 import type { Request, Response } from "express";
 import PDFDocument from "pdfkit";
+// @ts-ignore
+import SVGtoPDF from "svg-to-pdfkit";
+import axios from "axios";
+import path from "path";
+import fs from "fs";
 import { prisma } from "../../db";
 import { registrarError } from "../../utils/logger";
 import { uploadPdfDocument } from "../../utils/cloudinary";
 import type { TareaIdParams } from "./zod";
+
+// ─── Paleta Grupo Cuadra ──────────────────────────────────────────────────────
+const C = {
+  headerBg: "#FAF5EF",  // Crema cálido
+  topBar:   "#2E1208",  // Café muy oscuro
+  goldBar:  "#C49A3C",  // Dorado cálido
+  primary:  "#2E1208",  // Café oscuro
+  brown:    "#7B3D1E",  // Café cognac
+  gold:     "#C49A3C",  // Dorado
+  cream:    "#F3EDE4",  // Crema oscura
+  rule:     "#D4B896",  // Beige
+  muted:    "#9A6A4A",  // Café medio
+  white:    "#FFFFFF",
+} as const;
 
 export const generarPdfTarea = async (req: Request, res: Response) => {
   try {
@@ -14,24 +33,23 @@ export const generarPdfTarea = async (req: Request, res: Response) => {
       include: {
         creadoPor: { select: { nombre: true } },
         minuta: { select: { titulo: true, fechaRealizada: true, fechaProgramada: true } },
-        asignaciones: { include: { usuario: { select: { nombre: true } } } },
         imagenes: true
       },
     });
 
     if (!tarea) {
-      return res.status(404).json({ error: "Entrada no encontrada" });
+      return res.status(404).json({ error: "Tarea no encontrada" });
     }
 
     const pdfUrl = await new Promise<string>((resolve, reject) => {
-      const doc = new PDFDocument({ margin: 50, size: 'LETTER' });
+      const doc = new PDFDocument({ margin: 50, size: 'LETTER', bufferPages: true });
       const buffers: Buffer[] = [];
 
       doc.on("data", buffers.push.bind(buffers));
       doc.on("end", async () => {
         const pdfBuffer = Buffer.concat(buffers);
         try {
-          const filename = `Entrada_Externa_${tarea.id}`;
+          const filename = `Tarea_${tarea.id}_${Date.now()}`;
           const url = await uploadPdfDocument(pdfBuffer, filename);
           resolve(url);
         } catch (error) {
@@ -39,93 +57,162 @@ export const generarPdfTarea = async (req: Request, res: Response) => {
         }
       });
 
-      // Colors
-      const primaryColor = '#1e293b'; // slate-800
-      const secondaryColor = '#64748b'; // slate-500
-      const accentColor = '#8b5cf6'; // purple-500 (good for external)
-      const lightGray = '#f1f5f9';
+      const generateContent = async () => {
+        const PW = doc.page.width;
+        const MARGIN = 50;
+        const leftColX = MARGIN;
+        const rightColX = PW / 2;
 
-      // Encabezado (Header)
-      doc.rect(0, 0, doc.page.width, 100).fill(primaryColor);
+        // Franja superior café oscuro
+        doc.rect(0, 0, PW, 4).fill(C.topBar);
 
-      doc.fillColor('#ffffff')
-         .fontSize(24)
-         .font("Helvetica-Bold")
-         .text("TAREA EXTERNA", 50, 30);
-      
-      doc.fontSize(12)
-         .font("Helvetica")
-         .text(`ID: #${String(tarea.id).padStart(4, '0')}`, 50, 60);
+        // Fondo crema del header
+        doc.rect(0, 4, PW, 84).fill(C.headerBg);
 
-      const fecha = tarea.minuta?.fechaRealizada || tarea.minuta?.fechaProgramada || tarea.createdAt;
-      const fechaStr = new Date(fecha).toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' });
-      
-      doc.text(fechaStr, 0, 60, { align: 'right', width: doc.page.width - 50 });
+        // Franja inferior dorada
+        doc.rect(0, 88, PW, 4).fill(C.goldBar);
 
-      doc.moveDown(4);
+        // Logo — derecha
+        const logoPath = path.join(process.cwd(), "public", "img", "Grupo_Cuadra.svg");
+        if (fs.existsSync(logoPath)) {
+          const svg = fs.readFileSync(logoPath, "utf-8");
+          const logoX = PW - MARGIN - 181.58; 
+          SVGtoPDF(doc, svg, logoX, 18, { width: 181.58, height: 56, preserveAspectRatio: "xMidYMid meet" });
+        }
 
-      // ÁREA — protagonismo principal
-      doc.fillColor(accentColor)
-         .fontSize(16)
-         .font("Helvetica-Bold")
-         .text("ÁREA:", 50, 130);
-      
-      doc.fillColor(primaryColor)
-         .fontSize(22)
-         .font("Helvetica-Bold")
-         .text(tarea.linea || "No especificada", 50, 150);
+        // Texto header — izquierda
+        doc.fillColor(C.primary).fontSize(16).font("Helvetica-Bold")
+           .text("DETALLE DE TAREA", MARGIN, 22, { align: "left", width: PW - MARGIN - 200 });
+        doc.fillColor(C.muted).fontSize(9).font("Helvetica")
+           .text(`ID: #${String(tarea.id).padStart(4, '0')}`, MARGIN, 46, { align: "left", width: PW - MARGIN - 200 });
+        
+        const fecha = tarea.minuta?.fechaRealizada || tarea.minuta?.fechaProgramada || tarea.createdAt;
+        const fechaStr = new Date(fecha).toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' });
+        doc.fillColor(C.brown).fontSize(9).font("Helvetica")
+           .text(`Fecha: ${fechaStr}`, MARGIN, 62, { align: "left", width: PW - MARGIN - 200 });
 
-      // Divider
-      doc.moveTo(50, 185).lineTo(doc.page.width - 50, 185).lineWidth(2).strokeColor(lightGray).stroke();
+        let currentY = 120;
 
-      // Details Section
-      let currentY = 205;
-      const leftColX = 50;
-      const rightColX = doc.page.width / 2;
+        // ÁREA DESTINO
+        doc.fillColor(C.gold)
+           .fontSize(11)
+           .font("Helvetica-Bold")
+           .text("ÁREA DESTINO:", leftColX, currentY);
+        
+        doc.fillColor(C.primary)
+           .fontSize(15)
+           .font("Helvetica-Bold")
+           .text(tarea.area || "No especificada", leftColX, currentY + 14);
 
-      // Dirección — ahora en la sección de detalles
-      doc.fillColor(secondaryColor).fontSize(10).font("Helvetica-Bold").text("DIRECCIÓN", leftColX, currentY);
-      doc.fillColor(primaryColor).fontSize(12).font("Helvetica").text(tarea.area || "No especificada", leftColX, currentY + 15);
+        if (tarea.linea) {
+          doc.fillColor(C.gold)
+             .fontSize(11)
+             .font("Helvetica-Bold")
+             .text("LÍNEA:", rightColX, currentY);
+          
+          doc.fillColor(C.primary)
+             .fontSize(15)
+             .font("Helvetica-Bold")
+             .text(tarea.linea || "No especificada", rightColX, currentY + 14);
+        }
 
-      doc.fillColor(secondaryColor).fontSize(10).font("Helvetica-Bold").text("CLASIFICACIÓN", rightColX, currentY);
-      doc.fillColor(primaryColor).fontSize(12).font("Helvetica").text(tarea.clasificacion || "No especificada", rightColX, currentY + 15);
-
-      currentY += 45;
-      
-      if (tarea.minuta) {
-        doc.fillColor(secondaryColor).fontSize(10).font("Helvetica-Bold").text("MINUTA DE ORIGEN", leftColX, currentY);
-        doc.fillColor(primaryColor).fontSize(12).font("Helvetica").text(tarea.minuta.titulo, leftColX, currentY + 15);
         currentY += 45;
-      }
 
-      doc.fillColor(secondaryColor).fontSize(10).font("Helvetica-Bold").text("CREADO POR", leftColX, currentY);
-      doc.fillColor(primaryColor).fontSize(12).font("Helvetica").text(tarea.creadoPor.nombre, leftColX, currentY + 15);
-      
-      currentY += 45;
+        // Divider
+        doc.moveTo(leftColX, currentY).lineTo(PW - MARGIN, currentY).lineWidth(1).strokeColor(C.rule).stroke();
+        currentY += 15;
 
-      // Divider
-      doc.moveTo(50, currentY).lineTo(doc.page.width - 50, currentY).lineWidth(2).strokeColor(lightGray).stroke();
-      currentY += 20;
+        // Descripción
+        doc.fillColor(C.brown).fontSize(11).font("Helvetica-Bold").text("DESCRIPCIÓN:", leftColX, currentY);
+        currentY += 18;
 
-      // Description
-      doc.fillColor(secondaryColor).fontSize(12).font("Helvetica-Bold").text("DESCRIPCIÓN:", leftColX, currentY);
-      currentY += 20;
+        const descHeight = doc.heightOfString(tarea.descripcion, {
+          width: PW - 130,
+          align: 'justify'
+        });
+        const rectHeight = Math.max(50, descHeight + 30);
 
-      doc.rect(leftColX, currentY, doc.page.width - 100, 150).fill(lightGray);
-      doc.fillColor(primaryColor)
-         .fontSize(12)
-         .font("Helvetica")
-         .text(tarea.descripcion, leftColX + 15, currentY + 15, {
-            width: doc.page.width - 130,
-            align: 'justify'
-         });
+        doc.rect(leftColX, currentY, PW - 100, rectHeight).fill(C.cream);
+        doc.fillColor(C.primary)
+           .fontSize(11)
+           .font("Helvetica")
+           .text(tarea.descripcion, leftColX + 15, currentY + 15, {
+              width: PW - 130,
+              align: 'justify'
+           });
 
-      // Footer
-      doc.fontSize(10)
-         .fillColor(secondaryColor)
-         .text("Generado automáticamente por el Sistema de Minutas", 50, doc.page.height - 50, { align: 'center' });
+        currentY += rectHeight + 25;
 
-      doc.end();
+        // Evidencia visual (Imágenes)
+        if (tarea.imagenes && tarea.imagenes.length > 0) {
+          if (currentY > doc.page.height - 120) {
+            doc.addPage();
+            currentY = 50;
+          }
+
+          doc.fillColor(C.brown).fontSize(11).font("Helvetica-Bold")
+             .text("EVIDENCIA VISUAL / IMÁGENES:", leftColX, currentY);
+          currentY += 18;
+
+          let imgX = leftColX;
+          let imgRowY = currentY;
+
+          const IMG_GAP = 12;
+          const CW = PW - 100;
+          const IMG_W = Math.floor((CW - IMG_GAP) / 2);
+          const IMG_H = Math.round(IMG_W * 0.75);
+          const MAX_Y = doc.page.height - 70;
+
+          for (const img of tarea.imagenes) {
+            try {
+              if (imgX + IMG_W > PW - 50) {
+                imgRowY += IMG_H + IMG_GAP;
+                imgX = leftColX;
+              }
+
+              if (imgRowY + IMG_H > MAX_Y) {
+                doc.addPage();
+                imgRowY = 50;
+                imgX = leftColX;
+              }
+
+              const res2 = await axios.get(img.url, { responseType: "arraybuffer" });
+              const imgBuf = Buffer.from(res2.data as ArrayBuffer);
+
+              doc.rect(imgX, imgRowY, IMG_W, IMG_H)
+                 .lineWidth(0.5).strokeColor(C.rule).stroke();
+
+              doc.image(imgBuf, imgX + 2, imgRowY + 2, {
+                fit: [IMG_W - 4, IMG_H - 4],
+                align: "center",
+                valign: "center",
+              });
+
+              imgX += IMG_W + IMG_GAP;
+            } catch {
+              // Ignorar si falla la descarga
+            }
+          }
+        }
+
+        // Pie de página en todas las páginas
+        const pages = doc.bufferedPageRange();
+        for (let i = 0; i < pages.count; i++) {
+          doc.switchToPage(i);
+          doc.fontSize(8)
+             .fillColor(C.muted)
+             .text(
+               `Página ${i + 1} de ${pages.count}  |  Sistema de Gestión Interna Grupo Cuadra`,
+               50,
+               doc.page.height - 40,
+               { align: 'center', width: PW - 100 }
+             );
+        }
+
+        doc.end();
+      };
+
+      generateContent().catch(reject);
     });
 
     await prisma.tarea.update({

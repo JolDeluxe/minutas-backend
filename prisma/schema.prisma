@@ -265,10 +265,11 @@ model Tarea {
 
 // <--- NUEVO MODELO: ANEXOS DENTRO DE UNA TAREA
 model TareaNota {
-  id        Int     @id @default(autoincrement())
-  contenido String  @db.Text
-  imagenUrl String? @db.VarChar(500)
-  publicId  String? @db.VarChar(300) // Para Cloudinary
+  id        Int      @id @default(autoincrement())
+  contenido String   @db.Text
+  imagenUrl String?  @db.VarChar(500)
+  publicId  String?  @db.VarChar(300) // Para Cloudinary
+  esEntrega Boolean  @default(false)
 
   tareaId Int
   tarea   Tarea @relation(fields: [tareaId], references: [id], onDelete: Cascade)

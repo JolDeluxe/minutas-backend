@@ -21,11 +21,12 @@ export const listTareas = async (
     const queryParaResumen = { ...query, todo: true };
     delete (queryParaResumen as any).estado;
     delete (queryParaResumen as any).atrasadas;
+    delete (queryParaResumen as any).notificado;
 
     const whereParaResumen = buildTareasWhere(queryParaResumen, usuario);
     const orderBy = (sort ?? [{ createdAt: "desc" }]) as Prisma.TareaOrderByWithRelationInput[];
 
-    const [total, tareas, counts, totalAtrasadas, totalActivas, totalCerradas] =
+    const [total, tareas, counts, totalAtrasadas, totalActivas, totalCerradas, totalNotificados, totalSinNotificar] =
       await prisma.$transaction([
         prisma.tarea.count({ where }),
 
@@ -90,6 +91,20 @@ export const listTareas = async (
             ...whereParaResumen,
             tipo: TipoEntrada.TAREA,
             estado: EstadoTarea.CERRADA
+          }
+        }),
+
+        prisma.tarea.count({
+          where: {
+            ...whereParaResumen,
+            notificadoAt: { not: null }
+          }
+        }),
+
+        prisma.tarea.count({
+          where: {
+            ...whereParaResumen,
+            notificadoAt: null
           }
         })
       ]);
@@ -196,6 +211,8 @@ export const listTareas = async (
         totalPages: Math.ceil(total / limit),
         counts: countsObj,
         totalAtrasadas,
+        totalNotificados,
+        totalSinNotificar,
         tareas: tareasConMeta,
       },
     });

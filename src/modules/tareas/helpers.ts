@@ -157,6 +157,10 @@ export const buildTareasWhere = (
     where.minutaId = query.minutaId;
   }
 
+  if ((query as any).onlyGeneral === true) {
+    where.minutaId = null;
+  }
+
   if (query.creadoPorId != null) {
     where.creadoPorId = query.creadoPorId;
   }
@@ -191,6 +195,10 @@ export const buildTareasWhere = (
     where.fechaVencimiento = { lt: new Date() };
     where.tipo = TipoEntrada.TAREA;
     addEstadoNotInIncludingNull([EstadoTarea.CERRADA, EstadoTarea.CANCELADA]);
+  }
+
+  if (query.notificado !== undefined) {
+    where.notificadoAt = query.notificado ? { not: null } : null;
   }
 
   if (query.createdDesde || query.createdHasta) {
