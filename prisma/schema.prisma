@@ -164,6 +164,11 @@ model Minuta {
   tareas         Tarea[]
   notasGenerales NotaGeneral[] // <--- SE AGREGAN LOS POST-ITS A LA MINUTA
 
+  // ── Resumen IA (Gemini) ───────────────────────────────────────────
+  resumenTemas         String? @db.Text
+  resumenAcuerdos      String? @db.Text
+  resumenProximosPasos String? @db.Text
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

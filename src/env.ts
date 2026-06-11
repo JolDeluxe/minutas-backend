@@ -27,6 +27,9 @@ export const env = createEnv({
     VAPID_PUBLIC_KEY: z.string().min(1),
     VAPID_PRIVATE_KEY: z.string().min(1),
     VAPID_SUBJECT: z.string().url().or(z.string().startsWith("mailto:")),
+
+    // Gemini AI — opcional: si no está, el endpoint de resumen devuelve 503
+    GEMINI_API_KEY: z.string().optional(),
   },
   runtimeEnv: process.env,
   emptyStringAsUndefined: true,

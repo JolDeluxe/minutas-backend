@@ -14,6 +14,7 @@ import { reabrirMinuta } from "../modules/minutas/08_reopen";
 import { finalizarMinuta } from "../modules/minutas/09_finish";
 import { generarPdfPorArea } from "../modules/minutas/10_generate-pdf-area";
 import { consolidarBorradores } from "../modules/minutas/11_consolidar-borradores";
+import { guardarResumen } from "../modules/minutas/13_resumen";
 
 const router = Router();
 
@@ -47,5 +48,9 @@ router.post("/:id/consolidar", validate(minutaIdSchema), consolidarBorradores);
 // ─── RUTA BASE POR ID (Atrapa todo lo demás) ───
 // GET  /api/minutas/:id
 router.get("/:id",        validate(minutaIdSchema),      getMinutaById);
+
+// ─── RESUMEN DE MINUTA (MANUAL) ───
+// PUT  /api/minutas/:id/resumen
+router.put("/:id/resumen",          validate(minutaIdSchema), guardarResumen);
 
 export default router;
