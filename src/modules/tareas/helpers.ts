@@ -78,8 +78,9 @@ export const buildTareasWhere = (
   };
 
   const esMiBandejaPersonal = query.responsableId != null && Number(query.responsableId) === usuario.id;
+  const pidiendoSoloPoliticas = Array.isArray(query.tipo) && query.tipo.length === 1 && query.tipo[0] === TipoEntrada.POLITICA;
 
-  if (!esMiBandejaPersonal) {
+  if (!esMiBandejaPersonal && !pidiendoSoloPoliticas) {
     if (usuario.rol !== Rol.ADMIN && usuario.rol !== Rol.COORDINADOR && usuario.departamento) {
       where.departamento = usuario.departamento;
     } else if (usuario.rol === Rol.ADMIN && (query as any).departamento) {
@@ -113,13 +114,19 @@ export const buildTareasWhere = (
 
   if (query.tipo?.length) {
     where.tipo = { in: query.tipo as TipoEntrada[] };
+  } else {
+    // Si no se pide un tipo en específico, nunca mostramos las descartadas (eliminación lógica)
+    where.tipo = { not: TipoEntrada.DESCARTADA };
   }
 
   if (query.estado?.length) {
     where.estado = { in: query.estado as EstadoTarea[] };
   } else if (!query.atrasadas && !(query as any).todo && (!query.tipo || query.tipo.includes("TAREA" as any))) {
-    // Por defecto, esconder cerradas o canceladas a menos que pida "todo"
-    addEstadoNotInIncludingNull([EstadoTarea.CERRADA, EstadoTarea.CANCELADA]);
+    // Si NO se están pidiendo políticas específicamente, esconder cerradas/canceladas
+    const pidiendoSoloPoliticas = query.tipo?.length === 1 && query.tipo[0] === TipoEntrada.POLITICA;
+    if (!pidiendoSoloPoliticas) {
+      addEstadoNotInIncludingNull([EstadoTarea.CERRADA, EstadoTarea.CANCELADA]);
+    }
   }
 
   if (query.alcanceRecordatorio?.length) {
@@ -237,25 +244,33 @@ export const buildTareasWhere = (
 
   // Visibilidad base
   if (usuario.rol === Rol.COORDINADOR) {
-      and.push({
-        OR: [
-          {
-              asignaciones: { some: { usuarioId: usuario.id } }
-          },
+      const orConditions: Prisma.TareaWhereInput[] = [
+          { asignaciones: { some: { usuarioId: usuario.id } } },
           {
               tipo: TipoEntrada.RECORDATORIO,
               alcanceRecordatorio: AlcanceRecordatorio.DEPARTAMENTO,
               departamento: usuario.departamento ?? undefined,
               linea: usuario.lineas.length > 0 ? { in: usuario.lineas } : undefined
-          },
-          {
+          }
+      ];
+
+      // Solo si NO estamos forzando la vista general de políticas, agregamos la restricción departamental a políticas
+      if (!pidiendoSoloPoliticas) {
+          orConditions.push({
               tipo: TipoEntrada.POLITICA,
               departamento: usuario.departamento ?? undefined
-          }
-        ],
-      });
+          });
+      } else {
+          // Si estamos pidiendo solo políticas transversalmente, un coordinador puede verlas todas
+          orConditions.push({ tipo: TipoEntrada.POLITICA });
+      }
+
+      and.push({ OR: orConditions });
   } else if (query.responsableId != null) {
-      where.asignaciones = { some: { usuarioId: query.responsableId } };
+      // Para otros roles, si se filtra por responsable y no son solo políticas
+      if (!pidiendoSoloPoliticas) {
+         where.asignaciones = { some: { usuarioId: query.responsableId } };
+      }
   }
 
   if (and.length > 0) {

@@ -1,0 +1,1 @@
+import { prisma } from './src/db'; async function run() { const errors = await prisma.bitacora.findMany({ where: { accion: { startsWith: 'ERROR' } }, orderBy: { createdAt: 'desc' }, take: 3 }); console.log(JSON.stringify(errors, null, 2)); process.exit(0); } run();

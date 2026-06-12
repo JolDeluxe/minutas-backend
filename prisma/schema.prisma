@@ -35,6 +35,7 @@ enum Area {
   DIRECCION_TIENDAS
   DIRECCION_MKT
   DIRECCION_ALTA_CALIDAD
+  OTRA
 }
 
 enum Prioridad {
