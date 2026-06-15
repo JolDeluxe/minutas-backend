@@ -154,13 +154,25 @@ const generatePdfDocument = async (
         const metaY = doc.y;
         const halfW = CW / 2 - 8;
 
-        doc.fillColor(C.muted).fontSize(7).font("Helvetica-Bold")
-           .text("CLASIFICACIÓN", MARGIN, metaY, { width: halfW });
-        doc.fillColor(C.primary).fontSize(10).font("Helvetica")
-           .text(tarea.clasificacion ?? "General", MARGIN, metaY + 11, { width: halfW });
+        const isOperational = tarea.area === 'DISENO' || tarea.area === 'MARKETING';
+        const areaLabels: Record<string, string> = {
+          DISENO:            'Diseño',
+          MARKETING:         'Marketing',
+          DIRECCION_MBC:     'Dirección MBC',
+          DIRECCION_CFI:     'Dirección CFI',
+          DIRECCION_ADJUNTA: 'Dirección Adjunta',
+          DIRECCION_TIENDAS: 'Dirección Tiendas',
+          DIRECCION_MKT:     'Dirección MKT',
+          DIRECCION_ALTA_CALIDAD: 'Dirección Alta Calidad',
+        };
 
         doc.fillColor(C.muted).fontSize(7).font("Helvetica-Bold")
-           .text("LÍNEA", MARGIN + CW / 2, metaY, { width: halfW });
+           .text(isOperational ? "CLASIFICACIÓN" : "ÁREA", MARGIN, metaY, { width: halfW });
+        doc.fillColor(C.primary).fontSize(10).font("Helvetica")
+           .text(isOperational ? (tarea.clasificacion ?? "General") : (areaLabels[tarea.area] || tarea.area), MARGIN, metaY + 11, { width: halfW });
+
+        doc.fillColor(C.muted).fontSize(7).font("Helvetica-Bold")
+           .text(isOperational ? "LÍNEA" : "LÍNEA / DEPARTAMENTO", MARGIN + CW / 2, metaY, { width: halfW });
         doc.fillColor(C.primary).fontSize(10).font("Helvetica")
            .text(tarea.linea ?? "N/A", MARGIN + CW / 2, metaY + 11, { width: halfW });
 

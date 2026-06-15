@@ -195,19 +195,7 @@ export const generarPdfTarea = async (req: Request, res: Response) => {
           }
         }
 
-        // Pie de página en todas las páginas
-        const pages = doc.bufferedPageRange();
-        for (let i = 0; i < pages.count; i++) {
-          doc.switchToPage(i);
-          doc.fontSize(8)
-             .fillColor(C.muted)
-             .text(
-               `Página ${i + 1} de ${pages.count}  |  Sistema de Gestión Interna Grupo Cuadra`,
-               50,
-               doc.page.height - 40,
-               { align: 'center', width: PW - 100 }
-             );
-        }
+
 
         doc.end();
       };
