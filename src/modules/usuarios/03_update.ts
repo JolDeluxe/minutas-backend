@@ -30,7 +30,7 @@ export const updateUsuario = async (req: Request, res: Response) => {
     // Imagen nueva
     if (req.file) {
       try {
-        dataToUpdate.imagen = await uploadUserProfileImage(req.file.buffer);
+        dataToUpdate.imagen = await uploadUserProfileImage(req.file.buffer, req.file.mimetype, req.file.originalname);
         if (usuarioActual.imagen) {
           deleteImageByUrl(usuarioActual.imagen).catch(console.error);
         }

@@ -15,18 +15,32 @@ cloudinary.config({
 });
 
 // --- FUNCIÓN RECUPERADA: Para las fotos de perfil de usuario ---
-export const uploadUserProfileImage = async (buffer: Buffer): Promise<string> => {
+export const uploadUserProfileImage = async (
+  buffer: Buffer,
+  mimetype?: string,
+  filename?: string
+): Promise<string> => {
   return new Promise((resolve, reject) => {
+    const isHeic = mimetype === "image/heic" || mimetype === "image/heif" || 
+                   /\.(heic|heif)$/i.test(filename || "");
+
+    const options: any = {
+      folder: "TRACE/Usuarios",
+      resource_type: "image",
+      transformation: [
+        { width: 500, height: 500, crop: "thumb", gravity: "face" },
+        { quality: "auto:good" },
+        { fetch_format: "auto" },
+      ],
+    };
+
+    if (isHeic) {
+      console.log(`[Cloudinary] Detectada imagen HEIC/HEIF de perfil. Se forzará la conversión a JPG.`);
+      options.format = "jpg";
+    }
+
     const uploadStream = cloudinary.uploader.upload_stream(
-      {
-        folder: "TRACE/Usuarios",
-        resource_type: "image",
-        transformation: [
-          { width: 500, height: 500, crop: "thumb", gravity: "face" },
-          { quality: "auto:good" },
-          { fetch_format: "auto" },
-        ],
-      },
+      options,
       (error, result) => {
         if (error || !result) {
           console.error(`[Cloudinary] Error en uploadUserProfileImage:`, error);
@@ -44,20 +58,32 @@ export const uploadUserProfileImage = async (buffer: Buffer): Promise<string> =>
 // upload_stream es más robusto y detecta el formato real del buffer.
 export const uploadTaskImage = async (
   buffer: Buffer,
-  mimetype: string = "image/jpeg"
+  mimetype: string = "image/jpeg",
+  filename?: string
 ): Promise<{ url: string; publicId: string }> => {
   return new Promise((resolve, reject) => {
-    console.log(`[Cloudinary] Iniciando upload_stream, tamaño buffer: ${buffer.length} bytes`);
+    console.log(`[Cloudinary] Iniciando upload_stream, tamaño buffer: ${buffer.length} bytes (mimetype: ${mimetype}, filename: ${filename || 'ninguno'})`);
+    
+    const isHeic = mimetype === "image/heic" || mimetype === "image/heif" || 
+                   /\.(heic|heif)$/i.test(filename || "");
+
+    const options: any = {
+      folder: "minutas-diseño/imagenes",
+      resource_type: "image",
+      transformation: [
+        { width: 1280, crop: "limit" },
+        { quality: "auto:eco" }, // Mayor compresión para rendimiento móvil
+        { fetch_format: "auto" },
+      ],
+    };
+
+    if (isHeic) {
+      console.log(`[Cloudinary] Detectada imagen HEIC/HEIF. Se forzará la conversión a JPG.`);
+      options.format = "jpg";
+    }
+
     const uploadStream = cloudinary.uploader.upload_stream(
-      {
-        folder: "minutas-diseño/imagenes",
-        resource_type: "image",
-        transformation: [
-          { width: 1280, crop: "limit" },
-          { quality: "auto:eco" }, // Mayor compresión para rendimiento móvil
-          { fetch_format: "auto" },
-        ],
-      },
+      options,
       (error, result) => {
         if (error || !result) {
           console.error(`[Cloudinary] Error en upload_stream:`, error);

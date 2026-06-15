@@ -56,7 +56,7 @@ export const crearUsuario = async (req: Request, res: Response) => {
 
     if (req.file) {
       try {
-        imagenUrl = await uploadUserProfileImage(req.file.buffer);
+        imagenUrl = await uploadUserProfileImage(req.file.buffer, req.file.mimetype, req.file.originalname);
       } catch {
         return res.status(500).json({ error: "Error al subir la imagen." });
       }

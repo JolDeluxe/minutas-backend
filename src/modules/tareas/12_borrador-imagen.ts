@@ -8,7 +8,7 @@ export const uploadBorradorImagen = async (req: Request, res: Response): Promise
             return;
         }
 
-        const cldRes = await uploadTaskImage(req.file.buffer, req.file.mimetype);
+        const cldRes = await uploadTaskImage(req.file.buffer, req.file.mimetype, req.file.originalname);
 
         res.status(200).json({
             status: "success",

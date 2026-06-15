@@ -105,7 +105,8 @@ export const crearTarea = async (
           // Si una imagen falla, todo el bloque de creación de tareas fallará.
           const { url, publicId } = await uploadTaskImage(
             file.buffer,
-            file.mimetype
+            file.mimetype,
+            file.originalname
           );
           console.log(
             `[crearTarea] imagen subida OK: ${file.fieldname} → ${url}`

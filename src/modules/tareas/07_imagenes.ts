@@ -58,7 +58,7 @@ export const addImagenTarea = async (
       });
     }
 
-    const { url, publicId } = await uploadTaskImage(file.buffer);
+    const { url, publicId } = await uploadTaskImage(file.buffer, file.mimetype, file.originalname);
 
     const orden = imagenesDelTipo.length + 1;
 

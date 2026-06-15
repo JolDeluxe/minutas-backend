@@ -75,6 +75,12 @@ enum EstadoMinuta {
   CANCELADA
 }
 
+enum EstadoMinutaExterna {
+  ACTIVA
+  CERRADA
+  CANCELADA
+}
+
 enum TipoImagen {
   CAPTURA
   EVIDENCIA
@@ -129,6 +135,12 @@ model Usuario {
   resetTokens           PasswordResetToken[]
   notificaciones        Notificacion[]
   pushSubscriptions     PushSubscription[]
+
+  // Relaciones con Minutas Externas
+  minutasExternasCreadas  MinutaExterna[]  @relation("MinutaExternaCreador")
+  minutasExternasCerradas MinutaExterna[]  @relation("MinutaExternaCerrador")
+  tareasExternasCreadas   TareaExterna[]   @relation("TareaExternaCreador")
+  notasTareaExterna       TareaExternaNota[] @relation("TareaExternaNotaCreador")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -441,4 +453,113 @@ model PushSubscription {
   createdAt DateTime @default(now())
 
   @@index([usuarioId])
+}
+
+// ─── MINUTAS EXTERNAS ─────────────────────────────────────────────────────────
+// Sessiones de trabajo con departamentos distintos a Diseño y Marketing.
+// Mantiene el mismo concepto de "minuta" pero enfocado en áreas externas.
+
+model MinutaExterna {
+  id     Int                 @id @default(autoincrement())
+  tema   String              @db.VarChar(200)
+  area   Area                @default(DIRECCION_MBC)
+  // departamento = la sub-área / línea dentro del área (texto libre o valor de catálogo)
+  departamento String?       @db.VarChar(100)
+
+  objetivo    String?        @db.Text
+  integrantes String?        @db.Text   // JSON array de strings (nombres)
+  asistentes  String?        @db.Text   // JSON array de strings (nombres)
+
+  resumenTemas         String?   @db.Text
+  resumenAcuerdos      String?   @db.Text
+  resumenProximosPasos String?   @db.Text
+
+  estado EstadoMinutaExterna @default(ACTIVA)
+
+  creadoPorId Int
+  creadoPor   Usuario @relation("MinutaExternaCreador", fields: [creadoPorId], references: [id], onDelete: Restrict)
+
+  cerradoPorId Int?
+  cerradoPor   Usuario?  @relation("MinutaExternaCerrador", fields: [cerradoPorId], references: [id], onDelete: SetNull)
+  cerradoAt    DateTime?
+
+  fechaProgramada DateTime?
+
+  tareas TareaExterna[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([creadoPorId])
+  @@index([area])
+  @@index([estado])
+  @@index([createdAt])
+}
+
+/// Ítem de seguimiento dentro de una MinutaExterna.
+model TareaExterna {
+  id           Int          @id @default(autoincrement())
+  descripcion  String       @db.Text
+  area         Area         @default(DIRECCION_MBC)
+  // departamento = la sub-área / línea (texto libre)
+  departamento String?      @db.VarChar(100)
+
+  estado           EstadoTarea? @default(PENDIENTE)
+  prioridad        Prioridad?
+  fechaVencimiento DateTime?
+  completadoAt     DateTime?
+  cerradoAt        DateTime?
+
+  notificadoAt DateTime?
+
+  pdfUrl String? @db.Text
+
+  minutaExternaId Int
+  minutaExterna   MinutaExterna @relation(fields: [minutaExternaId], references: [id], onDelete: Cascade)
+
+  creadoPorId Int
+  creadoPor   Usuario @relation("TareaExternaCreador", fields: [creadoPorId], references: [id], onDelete: Restrict)
+
+  imagenes TareaExternaImagen[]
+  notas    TareaExternaNota[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([minutaExternaId])
+  @@index([estado])
+  @@index([area])
+  @@index([fechaVencimiento])
+  @@index([creadoPorId])
+}
+
+model TareaExternaImagen {
+  id       Int    @id @default(autoincrement())
+  url      String @db.VarChar(500)
+  publicId String @db.VarChar(300)
+  orden    Int
+  tipo     TipoImagen @default(CAPTURA)
+
+  tareaExternaId Int
+  tareaExterna   TareaExterna @relation(fields: [tareaExternaId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([tareaExternaId])
+}
+
+model TareaExternaNota {
+  id        Int      @id @default(autoincrement())
+  contenido String   @db.Text
+  esEntrega Boolean  @default(false)
+
+  tareaExternaId Int
+  tareaExterna   TareaExterna @relation(fields: [tareaExternaId], references: [id], onDelete: Cascade)
+
+  creadoPorId Int?
+  creadoPor   Usuario? @relation("TareaExternaNotaCreador", fields: [creadoPorId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([tareaExternaId])
 }
