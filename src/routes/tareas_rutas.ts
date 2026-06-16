@@ -23,7 +23,7 @@ import { changeEstadoTarea } from "../modules/tareas/05_change-status";
 import { deleteTarea }       from "../modules/tareas/06_delete";
 import { addImagenTarea, deleteImagenTarea } from "../modules/tareas/07_imagenes";
 import { generarPdfTarea }   from "../modules/tareas/08_generate-pdf";
-import { createNotaGeneral, createTareaNota, updateTareaNota, deleteTareaNota } from "../modules/tareas/10_notas";
+import { createNotaGeneral, updateNotaGeneral, deleteNotaGeneral, createTareaNota, updateTareaNota, deleteTareaNota } from "../modules/tareas/10_notas";
 import { toggleNotificado }  from "../modules/tareas/11_toggle-notificado";
 import { uploadBorradorImagen } from "../modules/tareas/12_borrador-imagen";
 
@@ -66,6 +66,9 @@ router.delete("/:id/imagenes/:imagenId", validate(imagenIdSchema), deleteImagenT
 
 // ── NOTAS ──
 router.post("/notas/general", validate(createNotaGeneralSchema), createNotaGeneral);
+router.put("/notas/general/:id", updateNotaGeneral);
+router.delete("/notas/general/:id", deleteNotaGeneral);
+
 router.post("/notas/tarea", validate(createTareaNotaSchema), createTareaNota);
 router.put("/notas/tarea/:id", updateTareaNota);
 router.delete("/notas/tarea/:id", deleteTareaNota);

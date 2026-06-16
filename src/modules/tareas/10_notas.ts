@@ -155,3 +155,49 @@ export const deleteTareaNota = async (
   }
 };
 
+export const updateNotaGeneral = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const { id } = req.params;
+    const { contenido } = req.body;
+    const usuarioId = req.user!.id;
+
+    const nota = await prisma.notaGeneral.findUnique({
+      where: { id: Number(id) },
+    });
+
+    if (!nota) {
+      return res.status(404).json({ error: "Nota general no encontrada" });
+    }
+
+    const updated = await prisma.notaGeneral.update({
+      where: { id: Number(id) },
+      data: { contenido },
+    });
+
+    return res.json({ status: "success", data: updated });
+  } catch (error) {
+    await registrarError("ACTUALIZAR_NOTA_GENERAL", req.user?.id ?? null, error);
+    return res.status(500).json({ error: "Error al actualizar la nota general" });
+  }
+};
+
+export const deleteNotaGeneral = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const { id } = req.params;
+
+    await prisma.notaGeneral.delete({
+      where: { id: Number(id) },
+    });
+
+    return res.json({ status: "success", message: "Nota general eliminada" });
+  } catch (error) {
+    await registrarError("ELIMINAR_NOTA_GENERAL", req.user?.id ?? null, error);
+    return res.status(500).json({ error: "Error al eliminar la nota general" });
+  }
+};
