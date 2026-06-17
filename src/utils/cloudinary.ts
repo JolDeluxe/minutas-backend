@@ -1,6 +1,13 @@
 import { v2 as cloudinary } from "cloudinary";
 import { env } from "../env";
 
+// Eliminar variable de entorno global CLOUDINARY_URL si existiese en el sistema,
+// para evitar que sobrescriba o interfiera con las credenciales explícitas configuradas abajo.
+if (process.env.CLOUDINARY_URL) {
+  console.log(`[Cloudinary Init] Detectado process.env.CLOUDINARY_URL. Eliminando de la memoria para evitar interferencia de firmas.`);
+  delete process.env.CLOUDINARY_URL;
+}
+
 // --- DIAGNÓSTICO DE CREDENCIALES ---
 console.log(`[Cloudinary Config] Cloud Name: ${env.CLOUDINARY_CLOUD_NAME ? 'OK' : '¡NO ENCONTRADO!'}`);
 console.log(`[Cloudinary Config] API Key: ${env.CLOUDINARY_API_KEY ? 'OK' : '¡NO ENCONTRADO!'}`);
@@ -14,111 +21,117 @@ cloudinary.config({
   secure: true, // Forzar URLs HTTPS
 });
 
-// --- FUNCIÓN RECUPERADA: Para las fotos de perfil de usuario ---
+// --- Para las fotos de perfil de usuario ---
 export const uploadUserProfileImage = async (
   buffer: Buffer,
   mimetype?: string,
   filename?: string
 ): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    const isHeic = mimetype === "image/heic" || mimetype === "image/heif" || 
-                   /\.(heic|heif)$/i.test(filename || "");
+  const isHeic = /\.(heic|heif)$/i.test(filename || "") || mimetype === "image/heic" || mimetype === "image/heif";
+  
+  // Determinar MIME type adecuado para el Data URI
+  const actualMime = isHeic ? "image/heic" : (mimetype || "image/jpeg");
+  const dataUri = `data:${actualMime};base64,${buffer.toString("base64")}`;
 
-    const options: any = {
-      folder: "TRACE/Usuarios",
-      resource_type: "image",
-      transformation: [
-        { width: 500, height: 500, crop: "thumb", gravity: "face" },
-        { quality: "auto:good" },
-        { fetch_format: "auto" },
-      ],
-    };
+  const options: any = {
+    folder: "TRACE/Usuarios",
+    resource_type: "auto",
+  };
 
-    if (isHeic) {
-      console.log(`[Cloudinary] Detectada imagen HEIC/HEIF de perfil. Se forzará la conversión a JPG.`);
-      options.format = "jpg";
-    }
+  if (isHeic) {
+    console.log(`[Cloudinary] Detectada imagen HEIC/HEIF de perfil. Procesando nativamente por Base64...`);
+  }
 
-    const uploadStream = cloudinary.uploader.upload_stream(
-      options,
-      (error, result) => {
-        if (error || !result) {
-          console.error(`[Cloudinary] Error en uploadUserProfileImage:`, error);
-          return reject(error ?? new Error("Cloudinary upload_stream: sin resultado"));
-        }
-        resolve(result.secure_url);
-      }
-    );
-    uploadStream.end(buffer);
-  });
+  try {
+    const result = await cloudinary.uploader.upload(dataUri, options);
+    
+    // Generar URL optimizada en tiempo de entrega (delivery)
+    const optimizedUrl = cloudinary.url(result.public_id, {
+      secure: true,
+      width: 500,
+      height: 500,
+      crop: "thumb",
+      gravity: "face",
+      quality: "auto:good",
+      fetch_format: "auto"
+    });
+    
+    return optimizedUrl;
+  } catch (error) {
+    console.error(`[Cloudinary] Error en uploadUserProfileImage (Base64):`, error);
+    throw error;
+  }
 };
 
-// ── FIX: Usa upload_stream (igual que uploadPdfDocument) ──────────────────────
-// El método upload() con data URI falla en Bun con imágenes no-JPEG.
-// upload_stream es más robusto y detecta el formato real del buffer.
+// --- Para las imágenes adjuntas a las tareas ---
 export const uploadTaskImage = async (
   buffer: Buffer,
   mimetype: string = "image/jpeg",
   filename?: string
 ): Promise<{ url: string; publicId: string }> => {
-  return new Promise((resolve, reject) => {
-    console.log(`[Cloudinary] Iniciando upload_stream, tamaño buffer: ${buffer.length} bytes (mimetype: ${mimetype}, filename: ${filename || 'ninguno'})`);
+  console.log(`[Cloudinary] Iniciando subida por uploader.upload (Base64), tamaño buffer: ${buffer.length} bytes (mimetype: ${mimetype}, filename: ${filename || 'ninguno'})`);
+  
+  const isHeic = /\.(heic|heif)$/i.test(filename || "") || mimetype === "image/heic" || mimetype === "image/heif";
+  
+  // Si la petición viene como application/octet-stream pero sabemos que es imagen por la extensión o es HEIC
+  let actualMime = mimetype;
+  if (mimetype === "application/octet-stream" && filename) {
+    if (/\.heic$/i.test(filename)) actualMime = "image/heic";
+    else if (/\.heif$/i.test(filename)) actualMime = "image/heif";
+    else if (/\.(jpg|jpeg)$/i.test(filename)) actualMime = "image/jpeg";
+    else if (/\.png$/i.test(filename)) actualMime = "image/png";
+    else if (/\.webp$/i.test(filename)) actualMime = "image/webp";
+  }
+  
+  const dataUri = `data:${actualMime};base64,${buffer.toString("base64")}`;
+
+  const options: any = {
+    folder: "minutas-diseño/imagenes",
+    resource_type: "auto",
+  };
+
+  if (isHeic) {
+    console.log(`[Cloudinary] Detectada imagen HEIC/HEIF. Procesando nativamente...`);
+  }
+
+  try {
+    const result = await cloudinary.uploader.upload(dataUri, options);
     
-    const isHeic = mimetype === "image/heic" || mimetype === "image/heif" || 
-                   /\.(heic|heif)$/i.test(filename || "");
-
-    const options: any = {
-      folder: "minutas-diseño/imagenes",
-      resource_type: "image",
-      transformation: [
-        { width: 1280, crop: "limit" },
-        { quality: "auto:eco" }, // Mayor compresión para rendimiento móvil
-        { fetch_format: "auto" },
-      ],
-    };
-
-    if (isHeic) {
-      console.log(`[Cloudinary] Detectada imagen HEIC/HEIF. Se forzará la conversión a JPG.`);
-      options.format = "jpg";
-    }
-
-    const uploadStream = cloudinary.uploader.upload_stream(
-      options,
-      (error, result) => {
-        if (error || !result) {
-          console.error(`[Cloudinary] Error en upload_stream:`, error);
-          return reject(
-            error ?? new Error("Cloudinary upload_stream: sin resultado")
-          );
-        }
-        console.log(`[Cloudinary] Upload exitoso: ${result.secure_url}`);
-        resolve({ url: result.secure_url, publicId: result.public_id });
-      }
-    );
-    uploadStream.end(buffer);
-  });
+    // Generar URL optimizada en tiempo de entrega
+    const optimizedUrl = cloudinary.url(result.public_id, {
+      secure: true,
+      width: 1280,
+      crop: "limit",
+      quality: "auto:eco",
+      fetch_format: "auto"
+    });
+    
+    console.log(`[Cloudinary] Upload exitoso. URL generada: ${optimizedUrl}`);
+    return { url: optimizedUrl, publicId: result.public_id };
+  } catch (error) {
+    console.error(`[Cloudinary] Error en uploadTaskImage (Base64):`, error);
+    throw error;
+  }
 };
 
-
+// --- Para los documentos PDF ---
 export const uploadPdfDocument = async (buffer: Buffer, filename: string): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    // Para evitar el error 401 (Unauthorized) por restricciones de seguridad de Cloudinary
-    // para PDFs tipo "image", subimos el documento como recurso "raw".
-    const pdfFilename = filename.endsWith('.pdf') ? filename : `${filename}.pdf`;
+  const pdfFilename = filename.endsWith('.pdf') ? filename : `${filename}.pdf`;
+  console.log(`[Cloudinary] Subiendo PDF por uploader.upload (Base64): ${pdfFilename}`);
+  
+  const dataUri = `data:application/pdf;base64,${buffer.toString("base64")}`;
 
-    const stream = cloudinary.uploader.upload_stream(
-      {
-        folder: "minutas-diseño/pdf",
-        resource_type: "raw",
-        public_id: pdfFilename,
-      },
-      (error, result) => {
-        if (error || !result) reject(error);
-        else resolve(result.secure_url);
-      }
-    );
-    stream.end(buffer);
-  });
+  try {
+    const result = await cloudinary.uploader.upload(dataUri, {
+      folder: "minutas-diseño/pdf",
+      resource_type: "raw",
+      public_id: pdfFilename,
+    });
+    return result.secure_url;
+  } catch (error) {
+    console.error(`[Cloudinary] Error en uploadPdfDocument (Base64):`, error);
+    throw error;
+  }
 };
 
 // --- ELIMINACIÓN DE ARCHIVOS ---
