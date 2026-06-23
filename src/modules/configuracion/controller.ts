@@ -7,6 +7,7 @@ const CATALOGOS_DEPARTAMENTO = {
       { value: "BOTA", label: "Bota", color: "#8b5cf6", icon: "hiking" },
       { value: "ROPA", label: "Ropa", color: "#ec4899", icon: "checkroom" },
       { value: "ACCESORIOS", label: "Accesorios", color: "#14b8a6", icon: "watch" },
+      { value: "TODAS", label: "Todas", color: "#64748b", icon: "all_inclusive" },
       { value: "OTROS", label: "Otros", color: "#64748b", icon: "more_horiz" },
     ],
     clasificaciones: [
