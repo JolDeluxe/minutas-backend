@@ -182,6 +182,13 @@ model Minuta {
   resumenAcuerdos      String? @db.Text
   resumenProximosPasos String? @db.Text
 
+  imagenUrl1           String? @db.VarChar(500)
+  publicId1            String? @db.VarChar(300)
+  imagenUrl2           String? @db.VarChar(500)
+  publicId2            String? @db.VarChar(300)
+  imagenUrl3           String? @db.VarChar(500)
+  publicId3            String? @db.VarChar(300)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
