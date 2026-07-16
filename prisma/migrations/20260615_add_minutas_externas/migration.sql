@@ -76,11 +76,11 @@ CREATE TABLE IF NOT EXISTS `tareaexternanota` (
 
 -- AddForeignKey MinutaExterna → Usuario (creador)
 ALTER TABLE `minutaexterna` ADD CONSTRAINT `MinutaExterna_creadoPorId_fkey`
-    FOREIGN KEY (`creadoPorId`) REFERENCES `usuario`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+    FOREIGN KEY (`creadoPorId`) REFERENCES `Usuario`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey MinutaExterna → Usuario (cerrador)
 ALTER TABLE `minutaexterna` ADD CONSTRAINT `MinutaExterna_cerradoPorId_fkey`
-    FOREIGN KEY (`cerradoPorId`) REFERENCES `usuario`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+    FOREIGN KEY (`cerradoPorId`) REFERENCES `Usuario`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey TareaExterna → MinutaExterna
 ALTER TABLE `tareaexterna` ADD CONSTRAINT `TareaExterna_minutaExternaId_fkey`
@@ -88,7 +88,7 @@ ALTER TABLE `tareaexterna` ADD CONSTRAINT `TareaExterna_minutaExternaId_fkey`
 
 -- AddForeignKey TareaExterna → Usuario (creador)
 ALTER TABLE `tareaexterna` ADD CONSTRAINT `TareaExterna_creadoPorId_fkey`
-    FOREIGN KEY (`creadoPorId`) REFERENCES `usuario`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+    FOREIGN KEY (`creadoPorId`) REFERENCES `Usuario`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey TareaExternaImagen → TareaExterna
 ALTER TABLE `tareaexternaimagen` ADD CONSTRAINT `TareaExternaImagen_tareaExternaId_fkey`
@@ -100,4 +100,4 @@ ALTER TABLE `tareaexternanota` ADD CONSTRAINT `TareaExternaNota_tareaExternaId_f
 
 -- AddForeignKey TareaExternaNota → Usuario (creador)
 ALTER TABLE `tareaexternanota` ADD CONSTRAINT `TareaExternaNota_creadoPorId_fkey`
-    FOREIGN KEY (`creadoPorId`) REFERENCES `usuario`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+    FOREIGN KEY (`creadoPorId`) REFERENCES `Usuario`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
