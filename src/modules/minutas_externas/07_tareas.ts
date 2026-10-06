@@ -5,6 +5,7 @@ import { registrarError } from "../../utils/logger";
 import { USUARIO_SELECT_BASICO } from "../shared-selects";
 import type { CreateTareaExternaInput, UpdateTareaExternaInput, ChangeEstadoTareaExternaInput, CreateTareaExternaNotaInput } from "./zod";
 import { uploadTaskImage } from "../../utils/cloudinary";
+import { getIdempotencyKey, markIdempotencyCompletedTx } from "../../middlewares/idempotency";
 
 export const createTareasExternas = async (req: Request, res: Response) => {
   try {
@@ -16,8 +17,10 @@ export const createTareasExternas = async (req: Request, res: Response) => {
     if (!minuta) return res.status(404).json({ error: "Minuta externa no encontrada" });
 
     const files = req.files as Express.Multer.File[] | undefined;
+    const idempotencyKey = getIdempotencyKey(res);
 
-    const creadas = await Promise.all(
+    // 1. Subida previa de imágenes
+    const tareasPreparadas = await Promise.all(
       tareas.map(async (t, index) => {
         const fieldNamePrefix = `files_${index}_`;
         let archivosDeEstaTarea = files
@@ -39,7 +42,20 @@ export const createTareasExternas = async (req: Request, res: Response) => {
           })
         );
 
-        const tarea = await prisma.tareaExterna.create({
+        return {
+          t,
+          imagenesData,
+        };
+      })
+    );
+
+    // 2. Transacción atómica única para crear todas las tareas externas y cerrar la clave de idempotencia
+    const creadas = await prisma.$transaction(async (tx) => {
+      const results: any[] = [];
+
+      for (const prep of tareasPreparadas) {
+        const { t, imagenesData } = prep;
+        const tarea = await tx.tareaExterna.create({
           data: {
             minutaExternaId,
             creadoPorId: usuarioId,
@@ -62,9 +78,17 @@ export const createTareasExternas = async (req: Request, res: Response) => {
             notas: { orderBy: { createdAt: "desc" } }
           }
         });
-        return tarea;
-      })
-    );
+        results.push(tarea);
+      }
+
+      const responsePayload = { status: "success", data: results };
+
+      if (idempotencyKey) {
+        await markIdempotencyCompletedTx(tx, idempotencyKey, 201, responsePayload);
+      }
+
+      return results;
+    });
 
     return res.status(201).json({ status: "success", data: creadas });
   } catch (error) {

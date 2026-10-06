@@ -7,8 +7,8 @@ const PLACEHOLDER_PATH = "/img/no-image.avif";
 const DEFAULT_BATCH_SIZE = 200;
 
 const getPlaceholderUrl = (): string => {
-  const baseUrl = env.PUBLIC_BASE_URL ?? `http://localhost:${env.PORT}`;
-  return `${baseUrl.replace(/\/$/, "")}${PLACEHOLDER_PATH}`;
+  // Retornar siempre ruta relativa canónica para evitar Mixed Content y acoplamiento a host/puerto
+  return PLACEHOLDER_PATH;
 };
 
 const getOlderThanDate = (months: number): Date => {

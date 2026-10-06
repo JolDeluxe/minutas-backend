@@ -15,6 +15,7 @@ import { finalizarMinuta } from "../modules/minutas/09_finish";
 import { generarPdfPorArea } from "../modules/minutas/10_generate-pdf-area";
 import { consolidarBorradores } from "../modules/minutas/11_consolidar-borradores";
 import { guardarResumen } from "../modules/minutas/13_resumen";
+import { idempotency } from "../middlewares/idempotency";
 
 const router = Router();
 
@@ -23,7 +24,7 @@ router.use(authenticate);
 // GET  /api/minutas
 router.get("/",           validate(listMinutasSchema),   listarMinutas);
 // POST /api/minutas
-router.post("/",          validate(createMinutaSchema),  crearMinuta);
+router.post("/",          idempotency, validate(createMinutaSchema),  crearMinuta);
 // PUT  /api/minutas/:id
 router.put("/:id",         validate(updateMinutaSchema),  editarMinuta);
 

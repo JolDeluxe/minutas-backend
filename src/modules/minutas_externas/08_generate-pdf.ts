@@ -61,15 +61,29 @@ const generatePdfExternaDocument = async (
 
     const fechaStr  = fmt(minuta.fechaProgramada ?? minuta.createdAt);
 
+let cachedLogoSvgExterna: string | null = null;
+const getLogoSvgExterna = (): string | null => {
+  if (cachedLogoSvgExterna !== null) return cachedLogoSvgExterna;
+  try {
+    const logoPath = path.join(process.cwd(), "public", "img", "Grupo_Cuadra.svg");
+    if (fs.existsSync(logoPath)) {
+      cachedLogoSvgExterna = fs.readFileSync(logoPath, "utf-8");
+      return cachedLogoSvgExterna;
+    }
+  } catch (err) {
+    console.error("[PDF Externa] Error leyendo logotipo SVG:", err);
+  }
+  return null;
+};
+
     const drawHeader = () => {
       doc.rect(0, 0, PW, 6).fill(C.topBar);
       doc.rect(0, 6, PW, HEADER_H - 12).fill(C.headerBg);
       doc.rect(0, HEADER_H - 6, PW, 6).fill(C.goldBar);
 
-      // Logo centrado
-      const logoPath = path.join(process.cwd(), "public", "img", "Grupo_Cuadra.svg");
-      if (fs.existsSync(logoPath)) {
-        const svg = fs.readFileSync(logoPath, "utf-8");
+      // Logo centrado con cache
+      const svg = getLogoSvgExterna();
+      if (svg) {
         const logoW = 200;
         const logoX = (PW - logoW) / 2;
         SVGtoPDF(doc, svg, logoX, 25, { width: logoW, height: 60, preserveAspectRatio: "xMidYMid meet" });
@@ -271,7 +285,10 @@ const generatePdfExternaDocument = async (
                   imgX    = MARGIN;
                 }
 
-                const res2     = await axios.get(img.url, { responseType: "arraybuffer" });
+                const res2     = await axios.get(img.url, { 
+                  responseType: "arraybuffer",
+                  timeout: 5000,
+                });
                 const imgBuf   = Buffer.from(res2.data as ArrayBuffer);
 
                 doc.rect(imgX, imgRowY, IMG_W, IMG_H)

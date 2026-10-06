@@ -27,6 +27,7 @@ import {
 import { getIO } from "../../utils/socket";
 import { notificarAsignacion } from "../notificaciones/services";
 import type { CreateTareaInput } from "./zod";
+import { getIdempotencyKey, markIdempotencyCompletedTx } from "../../middlewares/idempotency";
 
 export const crearTarea = async (
   req: Request,
@@ -75,16 +76,21 @@ export const crearTarea = async (
       files?.map((f) => `${f.fieldname}(${f.mimetype}, ${f.size}b)`) ?? []
     );
 
-    const tareasCompletasResp: any[] = [];
+    const idempotencyKey = getIdempotencyKey(res);
+
+    // 1. Preparar imágenes en memoria / Cloudinary por cada tarea ANTES de abrir la transacción
+    const tareasPreparadas: {
+      tareaInput: CreateTareaInput;
+      fechaVenc: Date | null;
+      imagenesValidas: { url: string; publicId: string; orden: number }[];
+    }[] = [];
 
     for (let index = 0; index < tareasPayload.length; index++) {
       const tareaInput = tareasPayload[index];
-
       if (!tareaInput) continue;
 
       const fechaVenc = normalizarFechaVencimiento(tareaInput.fechaVencimiento);
 
-      // Búsqueda de archivos simplificada y robusta
       const fieldNamePrefix = `files_${index}_`;
       let archivosDeEstaTarea = files
         ? files.filter((f) => f.fieldname.startsWith(fieldNamePrefix))
@@ -92,17 +98,13 @@ export const crearTarea = async (
 
       console.log(`[crearTarea] Tarea #${index}: Buscando con prefijo "${fieldNamePrefix}". Encontrados: ${archivosDeEstaTarea.length} archivos.`);
 
-      // Fallback por si la nomenclatura falla (no debería con el nuevo frontend)
       if (archivosDeEstaTarea.length === 0 && files && files.length > 0 && tareasPayload.length === 1) {
-          console.warn(`[crearTarea] Tarea #${index}: No se encontraron archivos por prefijo, aplicando fallback para única tarea.`);
-          archivosDeEstaTarea = files.slice(0, 3);
+        console.warn(`[crearTarea] Tarea #${index}: No se encontraron archivos por prefijo, aplicando fallback para única tarea.`);
+        archivosDeEstaTarea = files.slice(0, 3);
       }
 
-      // ── Upload paralelo de imágenes ───────────────────────
       const imagenesData = await Promise.all(
         (archivosDeEstaTarea || []).slice(0, 3).map(async (file, i) => {
-          // NOTA: El try/catch ahora está fuera del Promise.all
-          // Si una imagen falla, todo el bloque de creación de tareas fallará.
           const { url, publicId } = await uploadTaskImage(
             file.buffer,
             file.mimetype,
@@ -117,7 +119,20 @@ export const crearTarea = async (
 
       const imagenesValidas = imagenesData.filter((img): img is { url: string; publicId: string; orden: number } => img !== null);
 
-      const tareaIds = await prisma.$transaction(async (tx) => {
+      tareasPreparadas.push({
+        tareaInput,
+        fechaVenc,
+        imagenesValidas,
+      });
+    }
+
+    // 2. Ejecutar toda la creación y asignaciones dentro de una ÚNICA transacción atómica
+    const tareasCompletasResp = await prisma.$transaction(async (tx) => {
+      const allCreatedIds: number[] = [];
+
+      for (const prep of tareasPreparadas) {
+        const { tareaInput, fechaVenc, imagenesValidas } = prep;
+
         let departamento: Departamento = req.user!.departamento ?? "DISENO";
         if (req.user!.rol === "ADMIN") {
           departamento = tareaInput.area === "MARKETING" ? "MARKETING" : "DISENO";
@@ -162,20 +177,18 @@ export const crearTarea = async (
           },
         });
 
-        const createdIds = [nueva.id];
+        allCreatedIds.push(nueva.id);
 
         if (responsablesIds.length > 0) {
           if (esMultiResponsable) {
-            // Asignar el primer responsable a la tarea principal
             await tx.tareaAsignacion.create({
               data: {
                 tareaId: nueva.id,
                 usuarioId: responsablesIds[0]!,
                 asignadoPorId: usuarioId,
-              }
+              },
             });
 
-            // Crear copias para los otros responsables
             for (let i = 1; i < responsablesIds.length; i++) {
               const clon = await tx.tarea.create({
                 data: {
@@ -195,7 +208,7 @@ export const crearTarea = async (
                   organizadoPorId: usuarioId,
 
                   imagenes: {
-                    create: imagenesValidas.map(img => ({
+                    create: imagenesValidas.map((img) => ({
                       url: img.url,
                       publicId: img.publicId,
                       orden: img.orden,
@@ -212,7 +225,7 @@ export const crearTarea = async (
                           })),
                         }
                       : undefined,
-                }
+                },
               });
 
               await tx.tareaAsignacion.create({
@@ -220,40 +233,31 @@ export const crearTarea = async (
                   tareaId: clon.id,
                   usuarioId: responsablesIds[i]!,
                   asignadoPorId: usuarioId,
-                }
+                },
               });
 
-              createdIds.push(clon.id);
+              allCreatedIds.push(clon.id);
             }
           } else {
-            // Flujo normal (1 responsable o no es TAREA)
             await tx.tareaAsignacion.createMany({
-              data: responsablesIds.map(
-                (uid) => ({
-                  tareaId: nueva.id,
-                  usuarioId: uid,
-                  asignadoPorId: usuarioId,
-                })
-              ),
+              data: responsablesIds.map((uid) => ({
+                tareaId: nueva.id,
+                usuarioId: uid,
+                asignadoPorId: usuarioId,
+              })),
               skipDuplicates: true,
             });
           }
         }
+      }
 
-        return createdIds;
-      });
-
-      for (const tId of tareaIds) {
-        const tareaCompleta = await prisma.tarea.findUnique({
-          where: {
-            id: tId,
-          },
+      // Obtener tareas completas dentro de la transacción para responder exactamente la data
+      const fetchList: any[] = [];
+      for (const tId of allCreatedIds) {
+        const tareaCompleta = await tx.tarea.findUnique({
+          where: { id: tId },
           include: {
-            imagenes: {
-              orderBy: {
-                orden: "asc",
-              },
-            },
+            imagenes: { orderBy: { orden: "asc" } },
             asignaciones: {
               include: {
                 usuario: {
@@ -284,27 +288,36 @@ export const crearTarea = async (
                 estado: true,
               },
             },
-            notas: {
-              orderBy: {
-                createdAt: "desc",
-              },
-            },
+            notas: { orderBy: { createdAt: "desc" } },
           },
         });
-
         if (tareaCompleta) {
-          tareasCompletasResp.push(tareaCompleta);
-          
-          const asig = tareaCompleta.asignaciones?.[0];
-          if (asig) {
-            await notificarAsignacion(
-              tareaCompleta.id,
-              [asig.usuarioId],
-              tareaCompleta.descripcion,
-              tareaCompleta.linea
-            );
-          }
+          fetchList.push(tareaCompleta);
         }
+      }
+
+      const responsePayload = {
+        status: "success",
+        data: fetchList,
+      };
+
+      if (idempotencyKey) {
+        await markIdempotencyCompletedTx(tx, idempotencyKey, 201, responsePayload);
+      }
+
+      return fetchList;
+    });
+
+    // 3. Post-commit: Notificaciones y sockets
+    for (const tareaCompleta of tareasCompletasResp) {
+      const asig = tareaCompleta.asignaciones?.[0];
+      if (asig) {
+        await notificarAsignacion(
+          tareaCompleta.id,
+          [asig.usuarioId],
+          tareaCompleta.descripcion,
+          tareaCompleta.linea
+        ).catch((e) => console.error("[crearTarea] Error notificando asignación:", e));
       }
     }
 

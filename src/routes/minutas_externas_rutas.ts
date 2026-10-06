@@ -30,22 +30,23 @@ import {
   deleteTareaExternaNota
 } from "../modules/minutas_externas/07_tareas";
 
+import { upload } from "../middlewares/upload";
+import { idempotency } from "../middlewares/idempotency";
+
 const router = Router();
 router.use(authenticate);
 
 // ─── MINUTAS EXTERNAS ─────────────────────────────────────────────────────────
 router.get("/", validate(listMinutasExternasSchema), listarMinutasExternas);
-router.post("/", validate(createMinutaExternaSchema), crearMinutaExterna);
+router.post("/", idempotency, validate(createMinutaExternaSchema), crearMinutaExterna);
 router.get("/:id", validate(minutaExternaIdSchema), getMinutaExternaById);
 router.put("/:id", validate(updateMinutaExternaSchema), updateMinutaExterna);
 router.patch("/:id/cerrar", validate(minutaExternaIdSchema), cerrarMinutaExterna);
 router.delete("/:id", validate(minutaExternaIdSchema), eliminarMinutaExterna);
 router.get("/:id/pdf", validate(minutaExternaIdSchema), generarPdfMinutaExterna);
 
-import { upload } from "../middlewares/upload";
-
 // ─── TAREAS DE MINUTAS EXTERNAS ───────────────────────────────────────────────
-router.post("/:minutaId/tareas", upload.any(), validate(createTareaExternaSchema), createTareasExternas);
+router.post("/:minutaId/tareas", upload.any(), idempotency, validate(createTareaExternaSchema), createTareasExternas);
 router.put("/tareas/:id", validate(updateTareaExternaSchema), updateTareaExterna);
 router.delete("/tareas/:id", validate(tareaExternaIdSchema), deleteTareaExterna);
 

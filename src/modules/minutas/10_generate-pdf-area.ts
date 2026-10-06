@@ -33,6 +33,22 @@ const C = {
   white:    "#FFFFFF",
 } as const;
 
+// Cache en memoria para el SVG del logotipo (evita I/O síncrono recurrente que bloquea el Event Loop)
+let cachedLogoSvg: string | null = null;
+const getLogoSvg = (): string | null => {
+  if (cachedLogoSvg !== null) return cachedLogoSvg;
+  try {
+    const logoPath = path.join(process.cwd(), "public", "img", "Grupo_Cuadra.svg");
+    if (fs.existsSync(logoPath)) {
+      cachedLogoSvg = fs.readFileSync(logoPath, "utf-8");
+      return cachedLogoSvg;
+    }
+  } catch (err) {
+    console.error("[PDF] Error leyendo logotipo SVG:", err);
+  }
+  return null;
+};
+
 // ─── Generación de PDF Kit ────────────────────────────────────────────────────
 
 const generatePdfDocument = async (
@@ -85,10 +101,9 @@ const generatePdfDocument = async (
       // Franja inferior dorada
       doc.rect(0, HEADER_H - 4, PW, 4).fill(C.goldBar);
 
-      // Logo — derecha
-      const logoPath = path.join(process.cwd(), "public", "img", "Grupo_Cuadra.svg");
-      if (fs.existsSync(logoPath)) {
-        const svg = fs.readFileSync(logoPath, "utf-8");
+      // Logo — derecha (usando cache en memoria)
+      const svg = getLogoSvg();
+      if (svg) {
         const logoX = PW - MARGIN - 181.58;
         SVGtoPDF(doc, svg, logoX, 18, { width: 181.58, height: 56, preserveAspectRatio: "xMidYMid meet" });
       }
@@ -210,7 +225,10 @@ const generatePdfDocument = async (
                 imgX    = MARGIN;
               }
 
-              const res2     = await axios.get(img.url, { responseType: "arraybuffer" });
+              const res2     = await axios.get(img.url, { 
+                responseType: "arraybuffer",
+                timeout: 5000,
+              });
               const imgBuf   = Buffer.from(res2.data as ArrayBuffer);
 
               doc.rect(imgX, imgRowY, IMG_W, IMG_H)

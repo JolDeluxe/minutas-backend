@@ -574,3 +574,27 @@ model TareaExternaNota {
   @@index([tareaExternaId])
   @@map("tareaexternanota") // <--- MAPEO AÑADIDO
 }
+
+enum IdempotencyStatus {
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+model IdempotencyKey {
+  key         String            @id @db.VarChar(64)
+  targetPath  String            @db.VarChar(255)
+  method      String            @db.VarChar(10)
+  paramsHash  String            @db.VarChar(64)
+  usuarioId   Int
+  status      IdempotencyStatus @default(PROCESSING)
+  statusCode  Int?
+  response    String?           @db.LongText
+  lockedAt    DateTime          @default(now())
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@index([usuarioId])
+  @@index([createdAt])
+  @@map("idempotency_keys")
+}
