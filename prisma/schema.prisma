@@ -189,6 +189,8 @@ model Minuta {
   imagenUrl3           String? @db.VarChar(500)
   publicId3            String? @db.VarChar(300)
 
+  asistentes           String? @db.Text
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

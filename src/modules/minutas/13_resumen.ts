@@ -30,7 +30,8 @@ export const guardarResumen = async (req: Request, res: Response) => {
       imagenUrl2,
       publicId2,
       imagenUrl3,
-      publicId3
+      publicId3,
+      asistentes
     } = req.body as {
       resumenTemas?: string;
       resumenAcuerdos?: string;
@@ -41,6 +42,7 @@ export const guardarResumen = async (req: Request, res: Response) => {
       publicId2?: string | null;
       imagenUrl3?: string | null;
       publicId3?: string | null;
+      asistentes?: string | null;
     };
 
     // Verificar que la minuta existe
@@ -94,6 +96,10 @@ export const guardarResumen = async (req: Request, res: Response) => {
       }
     }
 
+    if (asistentes !== undefined) {
+      data.asistentes = typeof asistentes === "string" ? asistentes : JSON.stringify(asistentes);
+    }
+
     if (Object.keys(data).length === 0) {
       return res.status(400).json({ error: "No se enviaron campos a actualizar" });
     }
@@ -115,6 +121,7 @@ export const guardarResumen = async (req: Request, res: Response) => {
         publicId2: minutaActualizada.publicId2,
         imagenUrl3: minutaActualizada.imagenUrl3,
         publicId3: minutaActualizada.publicId3,
+        asistentes: (minutaActualizada as any).asistentes ?? null,
       },
     });
   } catch (error) {

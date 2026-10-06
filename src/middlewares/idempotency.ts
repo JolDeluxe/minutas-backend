@@ -69,6 +69,7 @@ export const idempotency = (req: Request, res: Response, next: NextFunction) => 
       let record;
 
       // 1. Intentar registrar de forma atómica la clave en estado PROCESSING
+      let isNewRecord = false;
       try {
         record = await prisma.idempotencyKey.create({
           data: {
@@ -81,6 +82,7 @@ export const idempotency = (req: Request, res: Response, next: NextFunction) => 
             lockedAt: new Date(),
           },
         });
+        isNewRecord = true;
       } catch (insertError: any) {
         if (insertError?.code === "P2002") {
           // La clave ya existe en MySQL
@@ -120,26 +122,30 @@ export const idempotency = (req: Request, res: Response, next: NextFunction) => 
         return res.status(record.statusCode).json(parsedData);
       }
 
-      if (record.status === "PROCESSING") {
-        // Si la clave ya existía previamente en PROCESSING:
-        // No ejecutar una segunda operación a ciegas bajo ninguna circunstancia.
-        // Si el proceso previo murió o sigue corriendo, responder 409 para proteger la integridad.
-        return res.status(409).json({
-          error: "Operación en proceso o interrumpida previamente. No se permite duplicar la ejecución.",
-          code: "IDEMPOTENT_OPERATION_IN_PROGRESS",
+      if (!isNewRecord) {
+        if (record.status === "PROCESSING") {
+          // Si la clave ya existía previamente en PROCESSING:
+          // No ejecutar una segunda operación a ciegas bajo ninguna circunstancia.
+          // Si el proceso previo murió o sigue corriendo, responder 409 para proteger la integridad.
+          return res.status(409).json({
+            error: "Operación en proceso o interrumpida previamente. No se permite duplicar la ejecución.",
+            code: "IDEMPOTENT_OPERATION_IN_PROGRESS",
+          });
+        }
+
+        // Si estaba en FAILED (un intento previo falló con error de validación/negocio): permitir reintento seguro
+        await prisma.idempotencyKey.update({
+          where: { key: cleanKey },
+          data: {
+            status: "PROCESSING",
+            lockedAt: new Date(),
+            statusCode: null,
+            response: null,
+          },
         });
       }
 
-      // Si estaba en FAILED (un intento previo falló con error de validación/negocio): permitir reintento seguro
-      await prisma.idempotencyKey.update({
-        where: { key: cleanKey },
-        data: {
-          status: "PROCESSING",
-          lockedAt: new Date(),
-          statusCode: null,
-          response: null,
-        },
-      });
+
 
       // Adjuntar la clave validada en res.locals para que el controlador la cierre dentro de su $transaction
       res.locals.idempotencyKey = cleanKey;

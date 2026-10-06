@@ -2,6 +2,7 @@ import { prisma } from "../db";
 import fs from "fs";
 import path from "path";
 import PDFDocument from "pdfkit";
+// @ts-ignore
 import SVGtoPDF from "svg-to-pdfkit";
 import axios from "axios";
 
