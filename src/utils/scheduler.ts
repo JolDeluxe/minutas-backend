@@ -48,7 +48,7 @@ export const iniciarTareasProgramadas = () => {
     }
 
     try {
-      const result = await cleanupOldTaskImages(3);
+      const result = await cleanupOldTaskImages(12);
 
       if (result.processed > 0 || result.errors > 0) {
         await prisma.bitacora.create({

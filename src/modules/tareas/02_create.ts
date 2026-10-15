@@ -100,11 +100,11 @@ export const crearTarea = async (
 
       if (archivosDeEstaTarea.length === 0 && files && files.length > 0 && tareasPayload.length === 1) {
         console.warn(`[crearTarea] Tarea #${index}: No se encontraron archivos por prefijo, aplicando fallback para única tarea.`);
-        archivosDeEstaTarea = files.slice(0, 3);
+        archivosDeEstaTarea = files.slice(0, 6);
       }
 
       const imagenesData = await Promise.all(
-        (archivosDeEstaTarea || []).slice(0, 3).map(async (file, i) => {
+        (archivosDeEstaTarea || []).slice(0, 6).map(async (file, i) => {
           const { url, publicId } = await uploadTaskImage(
             file.buffer,
             file.mimetype,

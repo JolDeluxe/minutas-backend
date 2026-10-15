@@ -18,7 +18,7 @@ const getOlderThanDate = (months: number): Date => {
 };
 
 export const cleanupOldTaskImages = async (
-  months = 3,
+  months = 12,
   batchSize = DEFAULT_BATCH_SIZE
 ): Promise<{ processed: number; replaced: number; errors: number }> => {
   const cutoff = getOlderThanDate(months);

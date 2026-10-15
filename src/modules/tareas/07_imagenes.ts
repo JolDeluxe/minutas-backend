@@ -35,8 +35,8 @@ export const addImagenTarea = async (
 
     const imagenesDelTipo = tarea.imagenes.filter(img => img.tipo === tipo);
 
-    if (imagenesDelTipo.length >= 3) {
-      return res.status(400).json({ error: `Máximo 3 imágenes de tipo ${tipo} por entrada` });
+    if (imagenesDelTipo.length >= 6) {
+      return res.status(400).json({ error: `Máximo 6 imágenes de tipo ${tipo} por entrada` });
     }
 
     const file = req.file;
@@ -79,7 +79,7 @@ export const addImagenTarea = async (
           const count = await tx.tareaImagen.count({
             where: { tareaId: hermana.id, tipo }
           });
-          if (count < 3) {
+          if (count < 6) {
             await tx.tareaImagen.create({
               data: {
                 url,

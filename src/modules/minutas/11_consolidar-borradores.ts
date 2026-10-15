@@ -33,7 +33,7 @@ const buildImagenesCreate = (images: any[] | undefined): ConsolidatedImage[] => 
             };
         })
         .filter((img): img is ConsolidatedImage => img !== null)
-        .slice(0, 3);
+        .slice(0, 6);
 };
 
 export const consolidarBorradores = async (req: Request, res: Response): Promise<void> => {
