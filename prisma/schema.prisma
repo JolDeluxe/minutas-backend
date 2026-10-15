@@ -188,6 +188,12 @@ model Minuta {
   publicId2            String? @db.VarChar(300)
   imagenUrl3           String? @db.VarChar(500)
   publicId3            String? @db.VarChar(300)
+  imagenUrl4           String? @db.VarChar(500)
+  publicId4            String? @db.VarChar(300)
+  imagenUrl5           String? @db.VarChar(500)
+  publicId5            String? @db.VarChar(300)
+  imagenUrl6           String? @db.VarChar(500)
+  publicId6            String? @db.VarChar(300)
 
   asistentes           String? @db.Text
 

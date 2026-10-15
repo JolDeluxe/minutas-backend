@@ -31,6 +31,12 @@ export const guardarResumen = async (req: Request, res: Response) => {
       publicId2,
       imagenUrl3,
       publicId3,
+      imagenUrl4,
+      publicId4,
+      imagenUrl5,
+      publicId5,
+      imagenUrl6,
+      publicId6,
       asistentes
     } = req.body as {
       resumenTemas?: string;
@@ -42,6 +48,12 @@ export const guardarResumen = async (req: Request, res: Response) => {
       publicId2?: string | null;
       imagenUrl3?: string | null;
       publicId3?: string | null;
+      imagenUrl4?: string | null;
+      publicId4?: string | null;
+      imagenUrl5?: string | null;
+      publicId5?: string | null;
+      imagenUrl6?: string | null;
+      publicId6?: string | null;
       asistentes?: string | null;
     };
 
@@ -53,6 +65,9 @@ export const guardarResumen = async (req: Request, res: Response) => {
         publicId1: true,
         publicId2: true,
         publicId3: true,
+        publicId4: true,
+        publicId5: true,
+        publicId6: true,
       },
     });
 
@@ -96,6 +111,30 @@ export const guardarResumen = async (req: Request, res: Response) => {
       }
     }
 
+    if (imagenUrl4 !== undefined) data.imagenUrl4 = imagenUrl4;
+    if (publicId4 !== undefined) {
+      data.publicId4 = publicId4;
+      if (publicId4 !== minuta.publicId4 && minuta.publicId4) {
+        await deleteImageByPublicId(minuta.publicId4);
+      }
+    }
+
+    if (imagenUrl5 !== undefined) data.imagenUrl5 = imagenUrl5;
+    if (publicId5 !== undefined) {
+      data.publicId5 = publicId5;
+      if (publicId5 !== minuta.publicId5 && minuta.publicId5) {
+        await deleteImageByPublicId(minuta.publicId5);
+      }
+    }
+
+    if (imagenUrl6 !== undefined) data.imagenUrl6 = imagenUrl6;
+    if (publicId6 !== undefined) {
+      data.publicId6 = publicId6;
+      if (publicId6 !== minuta.publicId6 && minuta.publicId6) {
+        await deleteImageByPublicId(minuta.publicId6);
+      }
+    }
+
     if (asistentes !== undefined) {
       data.asistentes = typeof asistentes === "string" ? asistentes : JSON.stringify(asistentes);
     }
@@ -121,6 +160,12 @@ export const guardarResumen = async (req: Request, res: Response) => {
         publicId2: minutaActualizada.publicId2,
         imagenUrl3: minutaActualizada.imagenUrl3,
         publicId3: minutaActualizada.publicId3,
+        imagenUrl4: minutaActualizada.imagenUrl4,
+        publicId4: minutaActualizada.publicId4,
+        imagenUrl5: minutaActualizada.imagenUrl5,
+        publicId5: minutaActualizada.publicId5,
+        imagenUrl6: minutaActualizada.imagenUrl6,
+        publicId6: minutaActualizada.publicId6,
         asistentes: (minutaActualizada as any).asistentes ?? null,
       },
     });
