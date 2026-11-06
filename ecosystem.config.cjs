@@ -3,7 +3,7 @@ module.exports = {
     {
       name: "mantenimiento-api",
       // Ruta absoluta al ejecutable real de Bun (evita wrappers .cmd)
-      script: "C:\\Users\\CUADRA\\AppData\\Roaming\\npm\\node_modules\\bun\\bin\\bun.exe",
+      script: 'C:\\Users\\joel.rodriguez\\.bun\\bin\\bun.exe',
       // Argumentos para que Bun ejecute el punto de entrada
       args: "run src/index.ts",
       // Le decimos a PM2 que no use ningún intérprete externo (ya definimos el exe arriba)
