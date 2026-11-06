@@ -1,7 +1,7 @@
 module.exports = {
   apps: [
     {
-      name: "mantenimiento-api",
+      name: "minutas-api",
       // Ruta absoluta al ejecutable real de Bun (evita wrappers .cmd)
       script: 'C:\\Users\\joel.rodriguez\\.bun\\bin\\bun.exe',
       // Argumentos para que Bun ejecute el punto de entrada
