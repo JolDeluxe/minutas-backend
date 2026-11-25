@@ -14,7 +14,8 @@ export const listarMinutas = async (req: Request, res: Response) => {
 
     const where = buildMinutasWhere(query, req.user);
 
-    const parsedSort = sort || [];
+    const defaultSort = [{ fechaProgramada: "desc" }];
+    const parsedSort = (sort && sort.length > 0) ? sort : defaultSort;
     const formattedSort = parsedSort.map((item: any) => {
       const newItem: any = {};
       for (const [key, value] of Object.entries(item)) {

@@ -55,7 +55,7 @@ export const login = async (req: Request, res: Response) => {
     const refreshToken = generateRefreshToken({ id: usuario.id });
 
     const expiresAt = new Date();
-    expiresAt.setFullYear(expiresAt.getFullYear() + 1);
+    expiresAt.setFullYear(expiresAt.getFullYear() + 5);
 
     await prisma.refreshToken.create({
       data: {

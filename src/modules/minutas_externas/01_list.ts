@@ -39,7 +39,10 @@ export const listarMinutasExternas = async (req: Request, res: Response) => {
         where,
         take: Number(limit),
         skip: offset,
-        orderBy: { createdAt: "desc" },
+        orderBy: [
+          { fechaProgramada: "desc" },
+          { createdAt: "desc" }
+        ],
         include: {
           creadoPor: { select: USUARIO_SELECT_BASICO },
           tareas: {
