@@ -29,6 +29,7 @@ async function main() {
       include: {
         minuta: true,
         creadoPor: true,
+        imagenes: true,
         asignaciones: {
           include: { usuario: true }
         }
@@ -38,7 +39,8 @@ async function main() {
     prisma.tareaExterna.findMany({
       include: {
         minutaExterna: true,
-        creadoPor: true
+        creadoPor: true,
+        imagenes: true
       },
       orderBy: { createdAt: 'desc' }
     }),
@@ -97,12 +99,14 @@ async function main() {
     { header: 'Prioridad', key: 'prioridad', width: 14 },
     { header: 'Fecha Límite', key: 'fechaLimite', width: 14 },
     { header: 'Persona(s) Asignada(s)', key: 'asignados', width: 28 },
+    { header: 'Fotos / Evidencias (Enlaces)', key: 'imagenes', width: 45 },
     { header: 'Registrado Por', key: 'creador', width: 22 },
     { header: 'Fecha de Registro', key: 'registro', width: 18 },
   ];
 
   for (const t of tareasInternas) {
     const asignados = t.asignaciones.map(a => a.usuario?.nombre).filter(Boolean).join(', ') || 'Sin asignar';
+    const imagenes = (t.imagenes || []).map((img, idx) => `[Foto ${idx + 1}]: ${img.url}`).join('\n') || 'Sin imágenes';
     wsTareas.addRow({
       fechaJunta: formatDate(t.minuta?.fechaProgramada || t.minuta?.fechaRealizada || t.createdAt),
       minuta: t.minuta?.titulo || 'Sin Minuta',
@@ -116,12 +120,14 @@ async function main() {
       prioridad: t.prioridad || 'MEDIA',
       fechaLimite: formatDate(t.fechaVencimiento),
       asignados: asignados,
+      imagenes: imagenes,
       creador: t.creadoPor?.nombre || 'Administrador',
       registro: formatDateTime(t.createdAt)
     });
   }
 
   for (const te of tareasExternas) {
+    const imagenes = (te.imagenes || []).map((img, idx) => `[Foto ${idx + 1}]: ${img.url}`).join('\n') || 'Sin imágenes';
     wsTareas.addRow({
       fechaJunta: formatDate(te.minutaExterna?.fechaProgramada || te.createdAt),
       minuta: te.minutaExterna?.tema || 'Minuta Externa',
@@ -135,6 +141,7 @@ async function main() {
       prioridad: te.prioridad || 'MEDIA',
       fechaLimite: formatDate(te.fechaVencimiento),
       asignados: 'Área Externa',
+      imagenes: imagenes,
       creador: te.creadoPor?.nombre || 'Administrador',
       registro: formatDateTime(te.createdAt)
     });
